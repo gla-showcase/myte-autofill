@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "MyTE Autofill Helper",
+  "short_name": "MyTE Autofill",
+  "version": "1.2.0",
+  "description": "Autofill Accenture MyTE timesheets with multi-WBS allocations and HW/Office patterns.",
+
+  "homepage_url": "https://github.com/your-repo-here/myte-autofill",
+  "offline_enabled": false,
+  "minimum_chrome_version": "100",
+  "minimum_edge_version": "100",
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
+  "permissions": [
+    "storage",
+    "scripting",
+    "activeTab",
+    "tabs"
+  ],
+
+  "host_permissions": [
+    "https://myte.accenture.com/*"
+  ],
+
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "action": {
+    "default_title": "MyTE Autofill"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["https://myte.accenture.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
