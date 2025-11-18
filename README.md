@@ -55,8 +55,8 @@ The extension then applies the pattern across all weeks automatically using user
 
 ### ✔️ Automatic Compliance Checkboxes
 Optionally auto-check:
-- “J’ai respecté mon repos quotidien”
-- “J’ai respecté mon repos hebdomadaire”
+- "I have respected my daily rest"
+- "I have respected my weekly rest"
 
 Works **only** on valid working days (never weekends or special days).
 

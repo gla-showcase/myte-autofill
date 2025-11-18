@@ -1,38 +1,43 @@
 ---
 name: Bug report
-about: Create a report to help us improve
-title: ''
-labels: ''
+about: Report an issue with MyTE Autofill Helper
+title: '[BUG] '
+labels: 'bug'
 assignees: ''
 
 ---
 
-**Describe the bug**
+## 🐛 Bug Description
 A clear and concise description of what the bug is.
 
-**To Reproduce**
+## 📋 To Reproduce
 Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+1. Navigate to MyTE timesheet page
+2. Click on '...'
+3. Configure '...'
+4. Observe error
 
-**Expected behavior**
+## ✅ Expected Behavior
 A clear and concise description of what you expected to happen.
 
-**Screenshots**
+## 🖼️ Screenshots
 If applicable, add screenshots to help explain your problem.
 
-**Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
+## 💻 Environment
+**Browser & Extension:**
+ - Browser: [e.g. Chrome, Edge]
+ - Browser Version: [e.g. 120.0.6099.109]
+ - Extension Version: [e.g. 1.2.0]
+ - OS: [e.g. Windows 11, macOS Sonoma]
 
-**Smartphone (please complete the following information):**
- - Device: [e.g. iPhone6]
- - OS: [e.g. iOS8.1]
- - Browser [e.g. stock browser, safari]
- - Version [e.g. 22]
+**MyTE Configuration:**
+ - Number of WBS codes: [e.g. 3]
+ - Daily hours configured: [e.g. 7.7]
+ - Using HW/Office pattern: [Yes/No]
+ - Compliance checkboxes enabled: [Yes/No]
 
-**Additional context**
-Add any other context about the problem here.
+## 📝 Additional Context
+Add any other context about the problem here:
+- Does it happen consistently or intermittently?
+- Did it work in a previous version?
+- Any console errors? (F12 → Console tab)
