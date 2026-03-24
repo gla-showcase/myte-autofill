@@ -1,0 +1,50 @@
+name: Release Chrome Extension
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate tag matches manifest version
+        shell: pwsh
+        run: |
+          $manifest = Get-Content -Path ./manifest.json -Raw | ConvertFrom-Json
+          $manifestVersion = [string]$manifest.version
+          if (-not $manifestVersion) {
+            throw 'manifest.json is missing a version value.'
+          }
+
+          $tagVersion = '${{ github.ref_name }}' -replace '^v', ''
+          if ($tagVersion -ne $manifestVersion) {
+            throw "Tag version v$tagVersion does not match manifest.json version $manifestVersion"
+          }
+
+      - name: Build Chrome package
+        id: package
+        shell: pwsh
+        run: ./scripts/package-chrome.ps1 -WriteGitHubOutput
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: ${{ steps.package.outputs.release_notes_path }}
+          files: |
+            ${{ steps.package.outputs.package_path }}
+            ${{ steps.package.outputs.contents_path }}
+            ${{ steps.package.outputs.release_notes_path }}
+          fail_on_unmatched_files: true

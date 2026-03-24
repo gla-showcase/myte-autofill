@@ -159,10 +159,42 @@ myte-autofill/
 
 ### Packaging
 
-Zip the entire extension folder (including icons) and upload to:
-- Chrome Web Store Developer Dashboard
+Update the version and rebuild the package in one step with:
 
-- Microsoft Edge Add-ons Portal
+```powershell
+./scripts/bump-version.ps1 -Version 1.3.1
+```
+
+This updates `manifest.json`, refreshes the README version badge, and rebuilds the Chrome package unless you pass `-SkipPackage`.
+
+Create the Chrome package with:
+
+```powershell
+./scripts/package-chrome.ps1
+```
+
+This produces:
+- `dist/myte-autofill-<version>-chrome.zip`
+- `dist/chrome-package-<version>/`
+- `dist/myte-autofill-<version>-chrome-contents.txt`
+- `dist/myte-autofill-<version>-release-notes.md`
+
+The zip artifact is ready for the Chrome Web Store and contains only the extension payload at the archive root.
+The generated release notes summarize product-impacting changes since the previous version tag and are intended for merge-to-main release prep.
+
+### GitHub Actions
+
+The repository includes a workflow at `.github/workflows/package-chrome.yml`.
+
+- Run it manually with **workflow_dispatch**
+
+The workflow uploads the generated Chrome package and contents manifest as build artifacts.
+It also uploads the generated release notes file.
+
+The repository also includes a release workflow at `.github/workflows/release-chrome.yml`.
+
+- Push a tag like `v1.2.3`
+- The workflow validates that the tag version matches `manifest.json`, builds the package, creates a GitHub Release, and attaches the zip, contents manifest, and generated release notes
 
 ---
 
@@ -177,3 +209,6 @@ Pull requests should preserve the extension’s **single purpose**:
 ## 📄 License
 
 MIT License.
+
+
+

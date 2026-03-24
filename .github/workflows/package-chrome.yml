@@ -1,0 +1,27 @@
+name: Package Chrome Extension
+
+on:
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Chrome package
+        id: package
+        shell: pwsh
+        run: ./scripts/package-chrome.ps1 -WriteGitHubOutput
+
+      - name: Upload Chrome package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrome-extension-${{ steps.package.outputs.package_version }}
+          path: |
+            ${{ steps.package.outputs.package_path }}
+            ${{ steps.package.outputs.contents_path }}
+            ${{ steps.package.outputs.release_notes_path }}
+          if-no-files-found: error
