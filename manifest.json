@@ -5,7 +5,7 @@
   "version": "1.3.0",
   "description": "Autofill Accenture MyTE timesheets with multi-WBS allocations and HW/Office patterns.",
 
-  "homepage_url": "https://github.com/your-repo-here/myte-autofill",
+  "homepage_url": "https://github.com/gla-showcase/myte-autofill",
   "offline_enabled": false,
   "minimum_chrome_version": "100",
 

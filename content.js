@@ -25,7 +25,12 @@ const state = {
   panel: null,
   initialized: false,
   wbsFilter: "", // search text for WBS
-  panelTemplate: null // <--- new
+  panelTemplate: null,
+  panelCreationPromise: null,
+  panelOpenRequested: false,
+  activeWbsPickerIndex: null,
+  wbsDrafts: {},
+  isSelectingWbsOption: false
 };
 
 /***********************
@@ -681,6 +686,225 @@ function updateWeekEmoji(dayIndex, mode) {
   if (mode === "Office") span.textContent = "🏢";
   else if (mode === "None") span.textContent = "⬜";
   else span.textContent = "🏠";
+
+  span.title = "Click to change";
+  span.setAttribute(
+    "aria-label",
+    `Change ${getWeekdayLabel(dayIndex)} work location. Current: ${getWorkLocationLabel(mode)}`
+  );
+}
+
+function roundWeight(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return 0;
+  return Math.round(numericValue * 100) / 100;
+}
+
+function formatWbsLabel(wbs) {
+  if (!wbs) return "";
+  const code = (wbs.code || "").trim();
+  const description = (wbs.description || "").trim();
+  return description ? `${code} - ${description}` : code;
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function findWbsByPickerValue(availableWbs, rawValue) {
+  const value = String(rawValue || "").trim();
+  if (!value) return null;
+
+  const exactCode = availableWbs.find((wbs) => (wbs.code || "").trim() === value);
+  if (exactCode) return exactCode;
+
+  const exactLabel = availableWbs.find((wbs) => formatWbsLabel(wbs) === value);
+  if (exactLabel) return exactLabel;
+
+  const [leadingCode] = value.split(" - ");
+  if (!leadingCode) return null;
+
+  return (
+    availableWbs.find((wbs) => (wbs.code || "").trim() === leadingCode.trim()) ||
+    null
+  );
+}
+
+function getWbsMetaMarkup(wbs) {
+  if (!wbs) {
+    return '<span class="myte-wbs-meta-empty">Type to search by code or description.</span>';
+  }
+
+  const code = (wbs.code || "").trim();
+  const description = (wbs.description || "").trim();
+  return `
+    <span class="myte-wbs-meta-code">${escapeHtml(code)}</span>
+    <span class="myte-wbs-meta-sep">•</span>
+    <span class="myte-wbs-meta-desc">${escapeHtml(description || "No description")}</span>
+  `;
+}
+
+function getOrderedWbsOptions(availableWbs, favoriteCodes, currentCode) {
+  const favorites = [];
+  const others = [];
+
+  availableWbs.forEach((wbs) => {
+    if (favoriteCodes.includes(wbs.code)) favorites.push(wbs);
+    else others.push(wbs);
+  });
+
+  const ordered = favorites.concat(others);
+  const current = availableWbs.find((wbs) => wbs.code === currentCode);
+  if (current && !ordered.some((wbs) => wbs.code === current.code)) {
+    ordered.unshift(current);
+  }
+
+  return ordered;
+}
+
+function filterWbsOptions(orderedOptions, query) {
+  const normalizedQuery = String(query || "").trim().toLowerCase();
+  if (!normalizedQuery) return orderedOptions;
+
+  return orderedOptions.filter((wbs) => {
+    const code = (wbs.code || "").toLowerCase();
+    const description = (wbs.description || "").toLowerCase();
+    return code.includes(normalizedQuery) || description.includes(normalizedQuery);
+  });
+}
+
+function closeWbsAutocomplete() {
+  state.activeWbsPickerIndex = null;
+  if (!state.panel) return;
+
+  state.panel.querySelectorAll(".myte-wbs-row").forEach((row) => {
+    row.classList.remove("myte-wbs-row-open");
+    const dropdown = row.querySelector(".myte-wbs-dropdown");
+    if (dropdown) {
+      dropdown.hidden = true;
+      dropdown.innerHTML = "";
+    }
+  });
+}
+
+function renderWbsAutocomplete(row, index) {
+  const dropdown = row.querySelector(".myte-wbs-dropdown");
+  if (!dropdown) return;
+
+  const allocations = state.config.wbsAllocations || [];
+  const allocation = allocations[index] || {};
+  const available = state.config.availableWbs || [];
+  const favoriteCodes = state.config.favoriteWbs || [];
+  const options = getOrderedWbsOptions(available, favoriteCodes, allocation.code);
+  const query = state.wbsDrafts[index] || "";
+  const filteredOptions = filterWbsOptions(options, query);
+  const isOpen = state.activeWbsPickerIndex === index;
+
+  if (!isOpen) {
+    dropdown.hidden = true;
+    dropdown.innerHTML = "";
+    row.classList.remove("myte-wbs-row-open");
+    return;
+  }
+
+  row.classList.add("myte-wbs-row-open");
+  dropdown.hidden = false;
+
+  if (!filteredOptions.length) {
+    dropdown.innerHTML = '<div class="myte-wbs-option-empty">No matching WBS</div>';
+    return;
+  }
+
+  dropdown.innerHTML = filteredOptions
+    .map((wbs) => {
+      const isFav = favoriteCodes.includes(wbs.code);
+      return `
+        <button type="button" class="myte-wbs-option" data-index="${index}" data-code="${escapeHtml(wbs.code)}">
+          <span class="myte-wbs-option-main">
+            <span class="myte-wbs-option-code">${escapeHtml(wbs.code)}</span>
+            <span class="myte-wbs-option-desc">${escapeHtml(wbs.description || "No description")}</span>
+          </span>
+          ${isFav ? '<span class="myte-wbs-option-fav">★</span>' : ""}
+        </button>
+      `;
+    })
+    .join("");
+}
+
+function selectWbsForRow(index, wbs) {
+  if (!state.config.wbsAllocations[index]) return;
+
+  state.config.wbsAllocations[index].code = wbs ? wbs.code : "";
+  delete state.wbsDrafts[index];
+  state.activeWbsPickerIndex = null;
+  saveConfig();
+  renderWbsList();
+}
+
+function normalizeWeightsToTwoDecimals(allocations) {
+  const normalizedItems = allocations.filter((allocation) => Number(allocation.weight || 0) > 0);
+  const total = normalizedItems.reduce(
+    (sum, allocation) => sum + Number(allocation.weight || 0),
+    0
+  );
+
+  if (!total) return false;
+
+  let accumulatedHundredths = 0;
+  normalizedItems.forEach((allocation, idx) => {
+    let hundredths;
+    if (idx === normalizedItems.length - 1) {
+      hundredths = 100 - accumulatedHundredths;
+    } else {
+      hundredths = Math.floor((Number(allocation.weight || 0) / total) * 100);
+      accumulatedHundredths += hundredths;
+    }
+
+    allocation.weight = hundredths / 100;
+  });
+
+  allocations.forEach((allocation) => {
+    if (!normalizedItems.includes(allocation)) {
+      allocation.weight = roundWeight(allocation.weight || 0);
+    }
+  });
+
+  return true;
+}
+
+function getWeekdayLabel(dayIndex) {
+  return ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"][dayIndex] || "Day";
+}
+
+function getWorkLocationLabel(mode) {
+  if (mode === "Office") return "Office / Client";
+  if (mode === "None") return "None";
+  return "Homeworking";
+}
+
+function getNextWorkLocationMode(mode) {
+  if (mode === "HW") return "Office";
+  if (mode === "Office") return "None";
+  return "HW";
+}
+
+function setWeeklyPatternDay(dayIdx, mode) {
+  if (!state.panel) return;
+
+  state.config.weeklyPattern[dayIdx] = mode;
+
+  const select = state.panel.querySelector(
+    `.myte-week-select[data-day-index="${dayIdx}"]`
+  );
+  if (select) select.value = mode;
+
+  updateWeekEmoji(dayIdx, mode);
+  saveConfig();
 }
 
 /* Weight summary helper */
@@ -690,7 +914,7 @@ function updateWeightSummary() {
   if (!summaryEl) return;
 
   const allocations = (state.config.wbsAllocations || []).filter(
-    (w) => w.code && Number(w.weight) > 0
+    (w) => Number(w.weight) > 0
   );
   const total = allocations.reduce(
     (sum, w) => sum + Number(w.weight || 0),
@@ -704,32 +928,80 @@ function updateWeightSummary() {
   summaryEl.classList.toggle("myte-weight-warn", !ok);
 }
 
+function validateWbsConfigForFill(config) {
+  const allocations = config.wbsAllocations || [];
+  if (!allocations.length) {
+    return "Configure at least one WBS before filling the timesheet.";
+  }
+
+  const hasBlankWbs = allocations.some(
+    (allocation) => !String(allocation.code || "").trim()
+  );
+  if (hasBlankWbs) {
+    return "Select a WBS on every allocation row before filling the timesheet.";
+  }
+
+  const totalWeight = allocations.reduce(
+    (sum, allocation) => sum + Number(allocation.weight || 0),
+    0
+  );
+  if (Math.abs(totalWeight - 1) > 0.001) {
+    return `Total weight must be 1.00 before filling the timesheet. Current total: ${totalWeight.toFixed(2)}.`;
+  }
+
+  return null;
+}
+
 /***********************
  * PANEL UI – creation
  ***********************/
 async function createPanel() {
   if (state.panel) return state.panel;
+  if (state.panelCreationPromise) return state.panelCreationPromise;
 
-  const tplRoot = await loadPanelTemplate();
-  if (!tplRoot) {
-    showToast("MyTE Autofill: cannot load panel template.", "error");
-    return null;
+  state.panelCreationPromise = (async () => {
+    const tplRoot = await loadPanelTemplate();
+    if (!tplRoot) {
+      if (state.panelOpenRequested) {
+        showToast("MyTE Autofill: cannot load panel template.", "error");
+      }
+      return null;
+    }
+
+    if (!state.panelOpenRequested) {
+      return null;
+    }
+
+    if (state.panel) {
+      return state.panel;
+    }
+
+    const panel = tplRoot.cloneNode(true);
+    document.body.appendChild(panel);
+    state.panel = panel;
+
+    wirePanelEvents();
+    applyConfigToUI();
+    applyThemeClass();
+    updateWbsCountLabel();
+    autoLoadWbsIfNeeded();
+
+    return panel;
+  })();
+
+  try {
+    return await state.panelCreationPromise;
+  } finally {
+    state.panelCreationPromise = null;
   }
-
-  const panel = tplRoot.cloneNode(true);
-  document.body.appendChild(panel);
-  state.panel = panel;
-
-  wirePanelEvents();
-  applyConfigToUI();
-  applyThemeClass();
-  updateWbsCountLabel();
-  autoLoadWbsIfNeeded();
-
-  return panel;
 }
 
 function removePanel() {
+  state.panelOpenRequested = false;
+  state.wbsFilter = "";
+  state.activeWbsPickerIndex = null;
+  state.wbsDrafts = {};
+
   if (state.panel) {
     state.panel.remove();
     state.panel = null;
@@ -737,9 +1009,10 @@ function removePanel() {
 }
 
 function togglePanel() {
-  if (state.panel) {
+  if (state.panel || state.panelOpenRequested) {
     removePanel();
   } else {
+    state.panelOpenRequested = true;
     createPanel(); // returns a Promise but we don't need to await
   }
 }
@@ -758,7 +1031,6 @@ function renderWbsList() {
   const available = cfg.availableWbs || [];
   const allocations = cfg.wbsAllocations || [];
   const favoriteCodes = cfg.favoriteWbs || [];
-  const filter = (state.wbsFilter || "").toLowerCase().trim();
 
   container.innerHTML = "";
 
@@ -772,69 +1044,51 @@ function renderWbsList() {
     return;
   }
 
-  const matchesFilter = (w) => {
-    if (!filter) return true;
-    const code = (w.code || "").toLowerCase();
-    const desc = (w.description || "").toLowerCase();
-    return code.includes(filter) || desc.includes(filter);
-  };
-
   allocations.forEach((alloc, index) => {
     const row = document.createElement("div");
     row.className = "myte-wbs-row";
-
-    const favList = [];
-    const otherList = [];
-
-    available.forEach((w) => {
-      const isFav = favoriteCodes.includes(w.code);
-      if (isFav) favList.push(w);
-      else otherList.push(w);
-    });
-
-    let optionsList = favList.filter(matchesFilter).concat(
-      otherList.filter(matchesFilter)
-    );
-
     const current = available.find((w) => w.code === alloc.code);
-    if (current && !optionsList.some((w) => w.code === current.code)) {
-      optionsList.unshift(current);
-    }
-
-    const wbsOptions = optionsList
-      .map((w) => {
-        const isFav = favoriteCodes.includes(w.code);
-        const labelPrefix = isFav ? "★ " : "";
-        return `<option value="${w.code}">${labelPrefix}${w.code} – ${w.description}</option>`;
-      })
-      .join("");
+    const selectedWbs = current || null;
+    const pickerValue = Object.prototype.hasOwnProperty.call(state.wbsDrafts, index)
+      ? state.wbsDrafts[index]
+      : selectedWbs
+        ? formatWbsLabel(selectedWbs)
+        : "";
 
     row.innerHTML = `
-      <select class="myte-wbs-select" data-index="${index}">
-        <option value="">Select WBS</option>
-        ${wbsOptions}
-      </select>
+      <div class="myte-wbs-main">
+        <input
+          type="text"
+          class="myte-wbs-picker"
+          data-index="${index}"
+          placeholder="Search WBS by code or description"
+          autocomplete="off"
+          value="${escapeHtml(pickerValue)}"
+        />
+      </div>
       <input
         type="number"
-        step="0.1"
+        step="0.01"
         min="0"
         class="myte-wbs-weight"
         data-index="${index}"
         placeholder="Weight"
       />
-      <button class="myte-wbs-fav" data-index="${index}" title="Toggle favorite">☆</button>
-      <button class="myte-wbs-remove" data-index="${index}" title="Remove">✕</button>
+      <div class="myte-wbs-actions">
+        <button class="myte-wbs-fav" data-index="${index}" title="Toggle favorite">☆</button>
+        <button class="myte-wbs-remove" data-index="${index}" title="Remove">✕</button>
+      </div>
+      <div class="myte-wbs-meta">${getWbsMetaMarkup(selectedWbs)}</div>
+      <div class="myte-wbs-dropdown" hidden></div>
     `;
 
     container.appendChild(row);
 
-    const select = row.querySelector(".myte-wbs-select");
     const weightInput = row.querySelector(".myte-wbs-weight");
     const favBtn = row.querySelector(".myte-wbs-fav");
 
-    if (select) select.value = alloc.code || "";
     if (weightInput && typeof alloc.weight !== "undefined") {
-      weightInput.value = alloc.weight;
+      weightInput.value = roundWeight(alloc.weight).toFixed(2);
     }
 
     const isFav =
@@ -848,6 +1102,8 @@ function renderWbsList() {
         favBtn.textContent = "☆";
       }
     }
+
+    renderWbsAutocomplete(row, index);
   });
 
   updateWeightSummary();
@@ -928,30 +1184,15 @@ function wirePanelEvents() {
       }
     });
 
-  // Search WBS
-  state.panel
-    .querySelector("#myte-wbs-search")
-    ?.addEventListener("input", (e) => {
-      state.wbsFilter = e.target.value || "";
-      renderWbsList();
-    });
-
   // Normalize weights
   state.panel
     .querySelector("#myte-normalize-weights")
     ?.addEventListener("click", () => {
       const allocations = state.config.wbsAllocations || [];
-      const total = allocations.reduce(
-        (sum, a) => sum + Number(a.weight || 0),
-        0
-      );
-      if (!total) {
+      if (!normalizeWeightsToTwoDecimals(allocations)) {
         showToast("Cannot normalize: total weight is 0.", "error");
         return;
       }
-      allocations.forEach((a) => {
-        a.weight = Number(a.weight || 0) / total;
-      });
       saveConfig();
       renderWbsList();
       showToast("Weights normalized to sum 1.0.", "success");
@@ -977,9 +1218,26 @@ function wirePanelEvents() {
     .forEach((sel) => {
       sel.addEventListener("change", (e) => {
         const dayIdx = Number(e.target.dataset.dayIndex);
-        state.config.weeklyPattern[dayIdx] = e.target.value;
-        updateWeekEmoji(dayIdx, e.target.value);
-        saveConfig();
+        setWeeklyPatternDay(dayIdx, e.target.value);
+      });
+    });
+
+  state.panel
+    .querySelectorAll(".myte-week-emoji")
+    .forEach((emojiBtn) => {
+      const handleToggle = () => {
+        const dayIdx = Number(emojiBtn.dataset.dayEmoji);
+        const currentMode = state.config.weeklyPattern[dayIdx] || "HW";
+        const nextMode = getNextWorkLocationMode(currentMode);
+        setWeeklyPatternDay(dayIdx, nextMode);
+      };
+
+      emojiBtn.addEventListener("click", handleToggle);
+      emojiBtn.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleToggle();
+        }
       });
     });
 
@@ -991,22 +1249,102 @@ function wirePanelEvents() {
       renderWbsList();
     });
 
+  state.panel.addEventListener("click", (e) => {
+    if (!e.target.closest(".myte-wbs-main") && !e.target.closest(".myte-wbs-dropdown")) {
+      closeWbsAutocomplete();
+    }
+  });
+
   const wbsContainer = state.panel.querySelector("#myte-wbs-list");
+
+  wbsContainer.addEventListener("focusin", (e) => {
+    if (!e.target.classList.contains("myte-wbs-picker")) return;
+    const idx = Number(e.target.dataset.index);
+    state.activeWbsPickerIndex = idx;
+    const row = e.target.closest(".myte-wbs-row");
+    if (row) renderWbsAutocomplete(row, idx);
+  });
+
+  wbsContainer.addEventListener("input", (e) => {
+    if (!e.target.classList.contains("myte-wbs-picker")) return;
+    const idx = Number(e.target.dataset.index);
+    state.wbsDrafts[idx] = e.target.value || "";
+    state.activeWbsPickerIndex = idx;
+    const row = e.target.closest(".myte-wbs-row");
+    if (row) renderWbsAutocomplete(row, idx);
+  });
+
+  wbsContainer.addEventListener("keydown", (e) => {
+    if (!e.target.classList.contains("myte-wbs-picker")) return;
+
+    const idx = Number(e.target.dataset.index);
+    const row = e.target.closest(".myte-wbs-row");
+    if (!row) return;
+
+    if (e.key === "Escape") {
+      closeWbsAutocomplete();
+      return;
+    }
+
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const options = filterWbsOptions(
+        getOrderedWbsOptions(
+          state.config.availableWbs || [],
+          state.config.favoriteWbs || [],
+          state.config.wbsAllocations[idx]?.code
+        ),
+        state.wbsDrafts[idx] || e.target.value || ""
+      );
+      selectWbsForRow(idx, options[0] || findWbsByPickerValue(state.config.availableWbs || [], e.target.value));
+    }
+  });
+
+  wbsContainer.addEventListener("change", (e) => {
+    if (e.target.classList.contains("myte-wbs-picker")) {
+      if (state.isSelectingWbsOption) {
+        state.isSelectingWbsOption = false;
+        return;
+      }
+
+      const idx = Number(e.target.dataset.index);
+      if (!state.config.wbsAllocations[idx]) return;
+
+      const match = findWbsByPickerValue(
+        state.config.availableWbs || [],
+        e.target.value
+      );
+
+      state.config.wbsAllocations[idx].code = match ? match.code : "";
+      delete state.wbsDrafts[idx];
+      state.activeWbsPickerIndex = null;
+      saveConfig();
+      renderWbsList();
+    }
+  });
+
+  wbsContainer.addEventListener("mousedown", (e) => {
+    const option = e.target.closest(".myte-wbs-option");
+    if (!option) return;
+
+    e.preventDefault();
+    state.isSelectingWbsOption = true;
+
+    const idx = Number(option.dataset.index);
+    const wbs = (state.config.availableWbs || []).find(
+      (item) => item.code === option.dataset.code
+    );
+    selectWbsForRow(idx, wbs || null);
+  });
 
   // Changes inside WBS list
   wbsContainer.addEventListener("change", (e) => {
-    if (e.target.classList.contains("myte-wbs-select")) {
+    if (e.target.classList.contains("myte-wbs-weight")) {
       const idx = Number(e.target.dataset.index);
-      const value = e.target.value;
-      if (!state.config.wbsAllocations[idx]) return;
-      state.config.wbsAllocations[idx].code = value;
-      saveConfig();
-      renderWbsList();
-    } else if (e.target.classList.contains("myte-wbs-weight")) {
-      const idx = Number(e.target.dataset.index);
-      const value = Number(e.target.value) || 0;
+      const value = roundWeight(e.target.value || 0);
       if (!state.config.wbsAllocations[idx]) return;
       state.config.wbsAllocations[idx].weight = value;
+      e.target.value = value.toFixed(2);
       saveConfig();
       updateWeightSummary();
     }
@@ -1014,22 +1352,26 @@ function wirePanelEvents() {
 
   // Clicks inside WBS list (remove / favorite)
   wbsContainer.addEventListener("click", (e) => {
+    const option = e.target.closest(".myte-wbs-option");
+    if (option) {
+      return;
+    }
+
     if (e.target.classList.contains("myte-wbs-remove")) {
       const idx = Number(e.target.dataset.index);
+      delete state.wbsDrafts[idx];
       state.config.wbsAllocations.splice(idx, 1);
       saveConfig();
       renderWbsList();
     } else if (e.target.classList.contains("myte-wbs-fav")) {
       const idx = Number(e.target.dataset.index);
-      const row = e.target.closest(".myte-wbs-row");
-      if (!row) return;
-      const select = row.querySelector(".myte-wbs-select");
-      if (!select || !select.value) {
+      const allocation = state.config.wbsAllocations[idx];
+      if (!allocation || !allocation.code) {
         showToast("Select a WBS before marking it as favorite.", "info");
         return;
       }
 
-      const code = select.value;
+      const code = allocation.code;
       const favs = state.config.favoriteWbs || [];
       const indexInFavs = favs.indexOf(code);
       if (indexInFavs === -1) {
@@ -1047,6 +1389,12 @@ function wirePanelEvents() {
   state.panel
     .querySelector("#myte-fill-btn-fixed")
     ?.addEventListener("click", async () => {
+      const validationError = validateWbsConfigForFill(state.config);
+      if (validationError) {
+        showToast(validationError, "error");
+        return;
+      }
+
       const btn = state.panel.querySelector("#myte-fill-btn-fixed");
       const detailsToFold = state.panel.querySelectorAll("details");
       const openStates = Array.from(detailsToFold).map((d) => d.open);

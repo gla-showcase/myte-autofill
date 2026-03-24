@@ -85,23 +85,18 @@
             </summary>
             <div class="myte-block-inner">
 
-                <div class="myte-inner-section">
-                    <input type="text" id="myte-wbs-search" class="myte-input"
-                        placeholder="Filter WBS by code or description..." />
-                </div>
-
                 <div id="myte-wbs-list"></div>
+
+                <div class="myte-inner-section myte-wbs-toolbar">
+                    <button id="myte-add-wbs" class="myte-btn myte-btn-primary myte-btn-strong">
+                        + Add WBS
+                    </button>
+                </div>
 
                 <div id="myte-weight-meta" class="myte-inner-section myte-weight-meta">
                     <span id="myte-weight-summary">Total weight: 0.00</span>
                     <button id="myte-normalize-weights" class="myte-btn myte-btn-small">
                         Normalize to 1.0
-                    </button>
-                </div>
-
-                <div class="myte-inner-section">
-                    <button id="myte-add-wbs" class="myte-btn myte-btn-small">
-                        + Add WBS
                     </button>
                 </div>
             </div>
@@ -122,7 +117,7 @@
                             <option value="Office">Office / Client</option>
                             <option value="None">None</option>
                         </select>
-                        <span class="myte-week-emoji" data-day-emoji="0">🏠</span>
+                        <span class="myte-week-emoji" data-day-emoji="0" role="button" tabindex="0" title="Click to change">🏠</span>
                     </div>
                     <div class="myte-week-row">
                         <div class="myte-week-label">Tue</div>
@@ -131,7 +126,7 @@
                             <option value="Office" selected>Office / Client</option>
                             <option value="None">None</option>
                         </select>
-                        <span class="myte-week-emoji" data-day-emoji="1">🏢</span>
+                        <span class="myte-week-emoji" data-day-emoji="1" role="button" tabindex="0" title="Click to change">🏢</span>
                     </div>
                     <div class="myte-week-row">
                         <div class="myte-week-label">Wed</div>
@@ -140,7 +135,7 @@
                             <option value="Office" selected>Office / Client</option>
                             <option value="None">None</option>
                         </select>
-                        <span class="myte-week-emoji" data-day-emoji="2">🏢</span>
+                        <span class="myte-week-emoji" data-day-emoji="2" role="button" tabindex="0" title="Click to change">🏢</span>
                     </div>
                     <div class="myte-week-row">
                         <div class="myte-week-label">Thu</div>
@@ -149,7 +144,7 @@
                             <option value="Office">Office / Client</option>
                             <option value="None">None</option>
                         </select>
-                        <span class="myte-week-emoji" data-day-emoji="3">🏠</span>
+                        <span class="myte-week-emoji" data-day-emoji="3" role="button" tabindex="0" title="Click to change">🏠</span>
                     </div>
                     <div class="myte-week-row">
                         <div class="myte-week-label">Fri</div>
@@ -158,7 +153,7 @@
                             <option value="Office">Office / Client</option>
                             <option value="None">None</option>
                         </select>
-                        <span class="myte-week-emoji" data-day-emoji="4">🏠</span>
+                        <span class="myte-week-emoji" data-day-emoji="4" role="button" tabindex="0" title="Click to change">🏠</span>
                     </div>
                 </div>
 
