@@ -83,11 +83,9 @@
   align-items: flex-start;
   justify-content: space-between;
   border-bottom: 1px solid var(--myte-border);
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.02),
-    rgba(0, 0, 0, 0.06)
-  );
+  background: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.02),
+      rgba(0, 0, 0, 0.06));
 }
 
 .myte-header-left {
@@ -174,7 +172,9 @@
 .myte-body {
   background: var(--myte-bg);
   overflow-y: auto;
-  padding-top: 8px;
+  /* remove bottom padding so bottom bar touches panel edge */
+  padding: 8px 18px 0;
+  flex: 1;
 }
 
 .myte-top-title {
@@ -250,6 +250,7 @@
     opacity: 0;
     transform: translateY(-2px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -279,8 +280,8 @@
   color: var(--myte-muted);
 }
 
+/* Generic inputs (NOT daily hours) */
 .myte-input,
-#myte-daily-hours,
 .myte-wbs-select,
 .myte-wbs-weight,
 .myte-week-select {
@@ -295,17 +296,36 @@
   box-shadow: inset 0 0 0 1px var(--myte-input-border);
 }
 
-#myte-daily-hours {
-  max-width: 120px;
-}
-
 .myte-input:focus,
-#myte-daily-hours:focus,
 .myte-wbs-select:focus,
 .myte-wbs-weight:focus,
 .myte-week-select:focus {
   border-color: var(--myte-primary);
   box-shadow: 0 0 0 1px var(--myte-primary-soft);
+}
+
+/* Daily hours – dedicated pill style */
+#myte-daily-hours {
+  border-radius: 999px;
+  border: 1px solid var(--myte-input-border);
+  background: var(--myte-input-bg);
+  color: var(--myte-text);
+  padding: 6px 10px;
+  font-size: 13px;
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--myte-input-border);
+}
+
+#myte-daily-hours:focus {
+  border-color: var(--myte-primary);
+  box-shadow: 0 0 0 1px var(--myte-primary-soft);
+}
+
+/* In config row, make it compact & centered */
+.myte-config-inline #myte-daily-hours {
+  width: 72px;
+  flex: 0 0 72px;
+  text-align: center;
 }
 
 /* Buttons */
@@ -354,45 +374,165 @@
 }
 
 /* ================================
-   WBS allocations
+   Config block layout (WBS + hours)
+   ================================ */
+
+.myte-config-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* Left side: WBS count badge + text */
+.myte-config-wbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.myte-wbs-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--myte-primary-soft);
+  color: var(--myte-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.myte-wbs-count-text {
+  font-size: 12px;
+  color: var(--myte-muted);
+}
+
+.myte-wbs-count-text-empty {
+  color: var(--myte-danger);
+}
+
+/* Reload button with icon */
+.myte-btn-icon {
+  padding-inline: 10px 14px;
+}
+
+.myte-btn-icon-symbol {
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* Daily hours inline */
+.myte-config-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.myte-inline-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* keeps grid aligned with previous row's button column */
+.myte-config-inline-spacer {
+  width: 110px;
+  /* roughly width of reload button area */
+  flex-shrink: 0;
+}
+
+/* small margin tweak so help text is closer to inline row */
+.myte-config-help {
+  margin-top: 4px;
+}
+
+/* ================================
+   WBS allocations – cleaner layout
    ================================ */
 
 #myte-wbs-list {
   margin-top: 6px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.02);
 }
 
+/* Individual WBS line */
 .myte-wbs-row {
   display: grid;
-  grid-template-columns: 1.7fr 0.6fr auto;
-  gap: 6px;
+  grid-template-columns: minmax(0, 1.9fr) auto 34px;
+  column-gap: 8px;
   align-items: center;
+
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--myte-bg);
+  border: 1px solid var(--myte-input-border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: box-shadow 0.12s ease-out, border-color 0.12s ease-out,
+    transform 0.08s ease-out;
 }
 
+.myte-wbs-row:hover {
+  border-color: var(--myte-primary);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+/* WBS dropdown */
+.myte-wbs-select {
+  width: 100%;
+  font-size: 12px;
+  padding: 6px 9px;
+}
+
+/* Weight input – compact pill */
+.myte-wbs-weight {
+  max-width: 70px;
+  justify-self: flex-end;
+  text-align: center;
+  font-size: 12px;
+  padding: 5px 6px;
+  border-radius: 999px;
+}
+
+/* Remove button */
 .myte-wbs-remove {
   border-radius: 999px;
   border: none;
-  background: rgba(255, 0, 0, 0.12);
+  background: rgba(255, 0, 0, 0.06);
   color: var(--myte-danger);
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 15px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.12s ease-out, transform 0.08s ease-out;
 }
 
 .myte-wbs-remove:hover {
-  background: rgba(255, 0, 0, 0.2);
+  background: rgba(255, 0, 0, 0.16);
+  transform: scale(1.02);
 }
 
+/* Empty state text */
 .myte-empty {
   font-size: 12px;
   color: var(--myte-muted);
-  margin-top: 4px;
+  margin-top: 2px;
+  padding: 4px 2px;
+}
+
+/* "+ Add WBS" button spacing */
+#myte-wbs-block .myte-inner-section {
+  margin-top: 10px;
 }
 
 /* ================================
@@ -408,7 +548,7 @@
 
 .myte-week-row {
   display: grid;
-  grid-template-columns: auto 0.9fr auto; /* dropdown narrower */
+  grid-template-columns: auto 0.9fr auto;
   align-items: center;
   gap: 10px;
 }
@@ -424,7 +564,7 @@
 }
 
 .myte-week-emoji {
-  font-size: 20px;   /* bigger emoji */
+  font-size: 20px;
   width: 26px;
   text-align: center;
 }
@@ -469,11 +609,15 @@
   opacity: 0;
   transform: translateY(8px);
   transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+  /* do not block clicks when hidden */
+  pointer-events: none;
 }
 
 .myte-toast.myte-toast-show {
   opacity: 1;
   transform: translateY(0);
+  /* clickable only while visible */
+  pointer-events: auto;
 }
 
 .myte-toast-icon {
@@ -498,12 +642,18 @@
   border-left: 4px solid #448aff;
 }
 
+/* ================================
+   Bottom bar / Fill button
+   ================================ */
+
 #myte-bottom-bar {
   position: sticky;
   bottom: 0;
   background: var(--myte-bg);
   border-top: 1px solid var(--myte-border);
   padding: 12px 16px;
+  margin-top: 12px;
+  /* separates content from bar, but bar still hugs panel bottom */
   display: flex;
   justify-content: flex-end;
   z-index: 50;
@@ -515,4 +665,3 @@
   font-size: 14px;
   border-radius: 8px;
 }
-

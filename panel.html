@@ -1,0 +1,178 @@
+<!-- panel.html -->
+<div id="myte-helper-panel">
+    <div class="myte-header">
+        <div class="myte-header-left">
+            <div class="myte-logo-wrap" aria-hidden="true">
+                <svg viewBox="0 0 38 41">
+                    <path class="cmp-logo__greater-than"
+                        d="M0 28.75L22.07 20.54L0 11.92V0.5L37.8 15.72V25.19L0 40.5V28.75Z">
+                    </path>
+                </svg>
+            </div>
+            <div class="myte-title-block">
+                <span class="myte-title">MyTE Autofill</span>
+                <span class="myte-subtitle">
+                    Autofill Accenture MyTE timesheets with multi-WBS allocations &amp; HW/Office pattern
+                </span>
+            </div>
+        </div>
+        <div class="myte-header-right">
+            <button id="myte-close-btn" title="Close" aria-label="Close panel">&times;</button>
+            <select id="myte-theme-select" aria-label="Theme">
+                <option value="corporate">Corporate</option>
+                <option value="dev">Dev</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="myte-body">
+        <div class="myte-top-title">Timesheet configuration</div>
+
+        <!-- Block 1: Configuration details -->
+        <details class="myte-block" id="myte-config-block" open>
+            <summary class="myte-block-summary">
+                <span>Configuration details</span>
+                <span class="myte-chevron"></span>
+            </summary>
+            <div class="myte-block-inner">
+
+                <!-- Row: WBS count + reload button -->
+                <div class="myte-inner-section myte-config-row">
+                    <div class="myte-config-wbs">
+                        <span class="myte-wbs-count-badge">
+                            <span id="myte-wbs-count-number">0</span>
+                        </span>
+                        <span id="myte-wbs-count-text" class="myte-wbs-count-text">
+                            No WBS loaded yet
+                        </span>
+                    </div>
+
+                    <button id="myte-load-wbs" class="myte-btn myte-btn-secondary myte-btn-icon">
+                        <span class="myte-btn-icon-symbol">⟳</span>
+                        <span class="myte-btn-label">Load WBS</span>
+                    </button>
+                </div>
+
+
+                <!-- Row: Daily total hours inline -->
+                <div class="myte-inner-section myte-config-row">
+                    <div class="myte-config-inline">
+                        <label for="myte-daily-hours" class="myte-inline-label">
+                            Daily total hours
+                        </label>
+                        <input type="number" step="0.1" min="0" id="myte-daily-hours" class="myte-inline-input" />
+                    </div>
+                    <!-- spacer to keep alignment with button column -->
+                    <div class="myte-config-inline-spacer"></div>
+                </div>
+
+                <div class="myte-inner-section myte-config-help">
+                    <small class="myte-help">
+                        Hours for each WBS are computed by weight so that each working day
+                        sums exactly to this value (1-decimal precision).
+                    </small>
+                </div>
+
+            </div>
+        </details>
+
+
+        <!-- Block 2: WBS allocations -->
+        <details class="myte-block" id="myte-wbs-block" open>
+            <summary class="myte-block-summary">
+                <span>WBS allocations (multi-project)</span>
+                <span class="myte-chevron"></span>
+            </summary>
+            <div class="myte-block-inner">
+
+                <div class="myte-inner-section">
+                    <input type="text" id="myte-wbs-search" class="myte-input"
+                        placeholder="Filter WBS by code or description..." />
+                </div>
+
+                <div id="myte-wbs-list"></div>
+
+                <div id="myte-weight-meta" class="myte-inner-section myte-weight-meta">
+                    <span id="myte-weight-summary">Total weight: 0.00</span>
+                    <button id="myte-normalize-weights" class="myte-btn myte-btn-small">
+                        Normalize to 1.0
+                    </button>
+                </div>
+
+                <div class="myte-inner-section">
+                    <button id="myte-add-wbs" class="myte-btn myte-btn-small">
+                        + Add WBS
+                    </button>
+                </div>
+            </div>
+        </details>
+
+        <!-- Block 3: Weekly pattern -->
+        <details class="myte-block" id="myte-weekly-block" open>
+            <summary class="myte-block-summary">
+                <span>Weekly Work Location Pattern</span>
+                <span class="myte-chevron"></span>
+            </summary>
+            <div class="myte-block-inner">
+                <div class="myte-week-rows">
+                    <div class="myte-week-row">
+                        <div class="myte-week-label">Mon</div>
+                        <select data-day-index="0" class="myte-week-select" aria-label="Monday work location">
+                            <option value="HW">Homeworking</option>
+                            <option value="Office">Office / Client</option>
+                            <option value="None">None</option>
+                        </select>
+                        <span class="myte-week-emoji" data-day-emoji="0">🏠</span>
+                    </div>
+                    <div class="myte-week-row">
+                        <div class="myte-week-label">Tue</div>
+                        <select data-day-index="1" class="myte-week-select" aria-label="Tuesday work location">
+                            <option value="HW">Homeworking</option>
+                            <option value="Office" selected>Office / Client</option>
+                            <option value="None">None</option>
+                        </select>
+                        <span class="myte-week-emoji" data-day-emoji="1">🏢</span>
+                    </div>
+                    <div class="myte-week-row">
+                        <div class="myte-week-label">Wed</div>
+                        <select data-day-index="2" class="myte-week-select" aria-label="Wednesday work location">
+                            <option value="HW">Homeworking</option>
+                            <option value="Office" selected>Office / Client</option>
+                            <option value="None">None</option>
+                        </select>
+                        <span class="myte-week-emoji" data-day-emoji="2">🏢</span>
+                    </div>
+                    <div class="myte-week-row">
+                        <div class="myte-week-label">Thu</div>
+                        <select data-day-index="3" class="myte-week-select" aria-label="Thursday work location">
+                            <option value="HW">Homeworking</option>
+                            <option value="Office">Office / Client</option>
+                            <option value="None">None</option>
+                        </select>
+                        <span class="myte-week-emoji" data-day-emoji="3">🏠</span>
+                    </div>
+                    <div class="myte-week-row">
+                        <div class="myte-week-label">Fri</div>
+                        <select data-day-index="4" class="myte-week-select" aria-label="Friday work location">
+                            <option value="HW">Homeworking</option>
+                            <option value="Office">Office / Client</option>
+                            <option value="None">None</option>
+                        </select>
+                        <span class="myte-week-emoji" data-day-emoji="4">🏠</span>
+                    </div>
+                </div>
+
+                <label class="myte-checkbox">
+                    <input type="checkbox" id="myte-auto-rest" />
+                    Auto-check daily &amp; weekly rest
+                </label>
+            </div>
+        </details>
+
+        <div id="myte-bottom-bar">
+            <button id="myte-fill-btn-fixed" class="myte-btn myte-btn-primary">
+                Fill Timesheet
+            </button>
+        </div>
+    </div>
+</div>

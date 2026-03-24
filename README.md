@@ -5,7 +5,7 @@
 ![Edge Add-ons](https://img.shields.io/badge/Edge_Add--ons-Pending-blue?logo=microsoftedge&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 ![Status](https://img.shields.io/badge/Status-Active-brightgreen)
-![Version](https://img.shields.io/badge/Version-1.2.0-purple)
+![Version](https://img.shields.io/badge/Version-1.3.0-purple)
 
 ⚠️ This is an independent helper tool.  
 It is **not** affiliated with, sponsored by, or endorsed by **Accenture** or the official **MyTE** product team.
@@ -13,6 +13,7 @@ It is **not** affiliated with, sponsored by, or endorsed by **Accenture** or the
 ---
 
 ## 🚀 Overview
+
 **MyTE Autofill Helper** automates repetitive tasks inside the Accenture MyTE timesheet interface.  
 It simulates real user actions to safely and reliably fill your timesheet—saving time and preventing mistakes.
 
@@ -26,13 +27,16 @@ If you log time every week or every half-month, this extension reduces the proce
 ## ✨ Features
 
 ### 🔢 Multi-WBS Hours Autofill
+
 - Add multiple WBS codes with weighted percentages.
 - Automatically splits your daily hours (default **7.7h**) based on these weights.
 - Ensures **perfect rounding** and correct totals (last WBS adjusted).
 - Simulates real typing + Tab validation in the grid.
 
 ### 📥 Automatic WBS Loading
+
 The extension:
+
 - Opens the MyTE WBS selection popup
 - Scrolls through the entire virtualized list
 - Extracts **only active (white) WBS**
@@ -44,6 +48,7 @@ No more guessing.
 Instant WBS filtering.
 
 ### 🏠🏢 Weekly Homeworking / Office Pattern
+
 Configure your weekly rhythm once.  
 For each weekday (Mon-Fri), choose:
 
@@ -54,14 +59,18 @@ For each weekday (Mon-Fri), choose:
 The extension then applies the pattern across all weeks automatically using user-simulated events.
 
 ### ✔️ Automatic Compliance Checkboxes
+
 Optionally auto-check:
+
 - "I have respected my daily rest"
 - "I have respected my weekly rest"
 
 Works **only** on valid working days (never weekends or special days).
 
 ### 🎨 Modern Embedded UI Panel
+
 The in-page control panel features:
+
 - Accenture-themed styles (**Corporate** and **Developer** modes)
 - Dark/light mode support
 - Foldable configuration categories
@@ -93,7 +102,9 @@ The tool fills everything and closes itself afterwards.
 ---
 
 ## 🔒 Privacy
+
 This extension:
+
 - Does **not** collect personal data  
 - Does **not** send information externally  
 - Does **not** use analytics or tracking  
@@ -106,8 +117,8 @@ See the full Privacy Policy in the repository.
 ---
 
 ## 🔧 Permissions
+
 - **storage** – Save user configuration (WBS, weights, theme, pattern)
-- **scripting** – Inject the automation code into the MyTE page
 - **activeTab** – Determine if the current tab is MyTE
 - **tabs** – Open MyTE automatically if needed
 - **host_permissions** (`https://myte.accenture.com/*`) – Required to interact with MyTE
@@ -118,6 +129,7 @@ No remote code is used.
 ---
 
 ## ⚠️ Disclaimer
+
 This is a personal productivity tool.  
 Users remain fully responsible for reviewing and validating their timesheets before submission.
 
@@ -134,8 +146,8 @@ myte-autofill/
 ├── manifest.json
 ├── background.js
 ├── content.js
+├── panel.html
 ├── styles.css
-├── LICENSE
 ├── README.md
 └── icons/
     ├── icon16.png
@@ -146,13 +158,16 @@ myte-autofill/
 ```
 
 ### Packaging
+
 Zip the entire extension folder (including icons) and upload to:
 - Chrome Web Store Developer Dashboard
+
 - Microsoft Edge Add-ons Portal
 
 ---
 
 ## 💬 Feedback & Contributions
+
 Issues and feature requests are welcome.  
 Pull requests should preserve the extension’s **single purpose**:  
 **Automating safe, accurate MyTE timesheet entry.**
@@ -160,4 +175,5 @@ Pull requests should preserve the extension’s **single purpose**:
 ---
 
 ## 📄 License
+
 MIT License.

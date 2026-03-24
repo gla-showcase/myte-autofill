@@ -10,20 +10,60 @@ const defaultConfig = {
     0: "HW",
     1: "Office",
     2: "Office",
-    3: "HW",
+    3: "Office",
     4: "HW"
   },
   autoCheckRest: true,
   themeStyle: "corporate", // 'corporate' | 'dev'
   wbsAllocations: [],
-  availableWbs: []
+  availableWbs: [],
+  favoriteWbs: [] // list of favorite WBS codes
 };
 
 const state = {
   config: { ...defaultConfig },
   panel: null,
-  initialized: false
+  initialized: false,
+  wbsFilter: "", // search text for WBS
+  panelTemplate: null // <--- new
 };
+
+/***********************
+ * PANEL HELPERS
+ ***********************/
+async function loadPanelTemplate() {
+  if (state.panelTemplate) return state.panelTemplate;
+
+  if (!chrome.runtime || !chrome.runtime.getURL) {
+    console.error("[MyTE] chrome.runtime.getURL not available in this context.");
+    return null;
+  }
+
+  const url = chrome.runtime.getURL("panel.html"); // or "ui/panel.html"
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      console.error("[MyTE] Failed to load panel.html:", resp.status, resp.statusText);
+      return null;
+    }
+
+    const html = await resp.text();
+    const tmpl = document.createElement("template");
+    tmpl.innerHTML = html.trim();
+
+    const root = tmpl.content.querySelector("#myte-helper-panel");
+    if (!root) {
+      console.error("[MyTE] panel.html missing #myte-helper-panel root.");
+      return null;
+    }
+
+    state.panelTemplate = root;
+    return root;
+  } catch (e) {
+    console.error("[MyTE] Error fetching panel.html:", e);
+    return null;
+  }
+}
 
 /***********************
  * STORAGE HELPERS
@@ -44,7 +84,8 @@ function loadConfig() {
           weeklyPattern: {
             ...defaultConfig.weeklyPattern,
             ...(stored.weeklyPattern || {})
-          }
+          },
+          favoriteWbs: stored.favoriteWbs || []
         };
       } else {
         state.config = { ...defaultConfig };
@@ -115,7 +156,11 @@ function showToast(message, type = "info") {
 
   const textSpan = toast.querySelector(".myte-toast-text");
   const iconSpan = toast.querySelector(".myte-toast-icon");
-  toast.classList.remove("myte-toast-info", "myte-toast-success", "myte-toast-error");
+  toast.classList.remove(
+    "myte-toast-info",
+    "myte-toast-success",
+    "myte-toast-error"
+  );
 
   if (type === "success") {
     toast.classList.add("myte-toast-success");
@@ -251,15 +296,28 @@ async function closeWbsPopup() {
   }
 }
 
-async function extractAllActiveWbsFromPage() {
-  const opener =
-    document.querySelector(
-      'button[id^="charge-code-"].assignment-container'
-    ) || document.querySelector('button[id^="charge-code-"]');
+async function waitForChargeCodeOpener(timeoutMs = 6000) {
+  const start = performance.now();
+  let opener = null;
 
+  while (performance.now() - start < timeoutMs) {
+    opener =
+      document.querySelector('button[id^="charge-code-"].assignment-container') ||
+      document.querySelector('button[id^="charge-code-"]');
+
+    if (opener) return opener;
+
+    await wait(200);
+  }
+
+  return null;
+}
+
+async function extractAllActiveWbsFromPage() {
+  const opener = await waitForChargeCodeOpener();
   if (!opener) {
-    console.warn("No charge-code opener button found.");
-    showToast("Open the Charge Codes popup first.", "error");
+    console.warn("No charge-code opener button found (not ready yet).");
+    showToast("MyTE not fully ready. Try Reload WBS in a few seconds.", "error");
     return [];
   }
 
@@ -462,7 +520,7 @@ async function fillTimesheetWithConfig(config) {
 }
 
 /***********************
- * TIME CATEGORY LOGIC (uses userSetCheckbox)
+ * TIME CATEGORY LOGIC
  ***********************/
 function applyWeeklyPatternAndRest(config) {
   const weeklyPattern = config.weeklyPattern || {};
@@ -525,7 +583,7 @@ function applyWeeklyPatternAndRest(config) {
 }
 
 /***********************
- * PANEL UI
+ * PANEL UI – helpers
  ***********************/
 function applyThemeClass() {
   if (!state.panel) return;
@@ -542,6 +600,77 @@ function applyThemeClass() {
   if (themeSelect) themeSelect.value = style;
 }
 
+function updateWbsButtonLabel() {
+  if (!state.panel) return;
+  const btn = state.panel.querySelector("#myte-load-wbs");
+  if (!btn) return;
+
+  const labelSpan = btn.querySelector(".myte-btn-label");
+  if (!labelSpan) return;
+
+  const hasWbs = (state.config.availableWbs || []).length > 0;
+  labelSpan.textContent = hasWbs ? "Reload WBS" : "Load WBS";
+
+  btn.disabled = false;
+}
+
+function updateWbsCountLabel() {
+  if (!state.panel) return;
+
+  const numberEl = state.panel.querySelector("#myte-wbs-count-number");
+  const textEl = state.panel.querySelector("#myte-wbs-count-text");
+  if (!numberEl || !textEl) return;
+
+  const count = (state.config.availableWbs || []).length;
+
+  numberEl.textContent = count;
+
+  if (count === 0) {
+    textEl.textContent = "No WBS loaded yet";
+    textEl.classList.add("myte-wbs-count-text-empty");
+  } else {
+    textEl.textContent = count === 1 ? "active WBS loaded" : "active WBS loaded";
+    textEl.classList.remove("myte-wbs-count-text-empty");
+  }
+}
+
+async function autoLoadWbsIfNeeded() {
+  // Only when panel is open AND no WBS known yet
+  if (!state.panel) return;
+
+  const hasWbs = (state.config.availableWbs || []).length > 0;
+  const hasAlloc = (state.config.wbsAllocations || []).length > 0;
+  if (hasWbs || hasAlloc) {
+    updateWbsButtonLabel();
+    return;
+  }
+
+  const btn = state.panel.querySelector("#myte-load-wbs");
+  if (btn) {
+    btn.disabled = true;
+    const labelSpan = btn.querySelector(".myte-btn-label");
+    if (labelSpan) {
+      labelSpan.textContent = "Loading WBS…";
+    }
+  }
+
+  try {
+    const wbs = await extractAllActiveWbsFromPage();
+    state.config.availableWbs = wbs;
+    updateWbsCountLabel();
+    if (!state.config.wbsAllocations.length && wbs.length) {
+      state.config.wbsAllocations = [{ code: wbs[0].code, weight: 1 }];
+    }
+    saveConfig();
+    renderWbsList();
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      updateWbsButtonLabel();
+    }
+  }
+}
+
 function updateWeekEmoji(dayIndex, mode) {
   if (!state.panel) return;
   const span = state.panel.querySelector(
@@ -554,126 +683,48 @@ function updateWeekEmoji(dayIndex, mode) {
   else span.textContent = "🏠";
 }
 
-function createPanel() {
+/* Weight summary helper */
+function updateWeightSummary() {
+  if (!state.panel) return;
+  const summaryEl = state.panel.querySelector("#myte-weight-summary");
+  if (!summaryEl) return;
+
+  const allocations = (state.config.wbsAllocations || []).filter(
+    (w) => w.code && Number(w.weight) > 0
+  );
+  const total = allocations.reduce(
+    (sum, w) => sum + Number(w.weight || 0),
+    0
+  );
+  const rounded = Math.round(total * 100) / 100;
+
+  summaryEl.textContent = `Total weight: ${rounded.toFixed(2)}`;
+  const ok = Math.abs(total - 1) < 0.001;
+  summaryEl.classList.toggle("myte-weight-ok", ok);
+  summaryEl.classList.toggle("myte-weight-warn", !ok);
+}
+
+/***********************
+ * PANEL UI – creation
+ ***********************/
+async function createPanel() {
   if (state.panel) return state.panel;
 
-  const panel = document.createElement("div");
-  panel.id = "myte-helper-panel";
+  const tplRoot = await loadPanelTemplate();
+  if (!tplRoot) {
+    showToast("MyTE Autofill: cannot load panel template.", "error");
+    return null;
+  }
 
-  panel.innerHTML = `
-    <div class="myte-header">
-      <div class="myte-header-left">
-        <div class="myte-logo-wrap" aria-hidden="true">
-          <svg viewBox="0 0 38 41">
-            <path class="cmp-logo__greater-than"
-              d="M0 28.75L22.07 20.54L0 11.92V0.5L37.8 15.72V25.19L0 40.5V28.75Z">
-            </path>
-          </svg>
-        </div>
-        <div class="myte-title-block">
-          <span class="myte-title">MyTE Autofill</span>
-          <span class="myte-subtitle">Autofill Accenture MyTE timesheets with multi-WBS allocations & HW/Office pattern</span>
-        </div>
-      </div>
-      <div class="myte-header-right">
-        <button id="myte-close-btn" title="Close">&times;</button>
-        <select id="myte-theme-select">
-          <option value="corporate">Corporate</option>
-          <option value="dev">Dev</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="myte-body">
-      <div class="myte-top-title">Timesheet configuration</div>
-
-      <!-- Block 1: Configuration details -->
-      <details class="myte-block" id="myte-config-block" open>
-        <summary class="myte-block-summary">
-          <span>Configuration details</span>
-          <span class="myte-chevron"></span>
-        </summary>
-        <div class="myte-block-inner">
-          <div class="myte-inner-section">
-            <button id="myte-load-wbs" class="myte-btn myte-btn-secondary">
-              Load WBS from page
-            </button>
-          </div>
-
-          <div class="myte-inner-section">
-            <label class="myte-label">
-              Daily total hours:
-              <input type="number" step="0.1" min="0" id="myte-daily-hours" />
-            </label>
-            <small class="myte-help">
-              Hours for each WBS are computed by weight so that each working day sums exactly to this value (1-decimal precision).
-            </small>
-          </div>
-        </div>
-      </details>
-
-      <!-- Block 2: WBS allocations -->
-      <details class="myte-block" id="myte-wbs-block" open>
-        <summary class="myte-block-summary">
-          <span>WBS allocations (multi-project)</span>
-          <span class="myte-chevron"></span>
-        </summary>
-        <div class="myte-block-inner">
-          <div id="myte-wbs-list"></div>
-          <div class="myte-inner-section">
-            <button id="myte-add-wbs" class="myte-btn myte-btn-small">
-              + Add WBS
-            </button>
-          </div>
-        </div>
-      </details>
-
-      <!-- Block 3: Weekly pattern + Fill -->
-      <details class="myte-block" id="myte-weekly-block" open>
-        <summary class="myte-block-summary">
-          <span>Weekly Work Location Pattern</span>
-          <span class="myte-chevron"></span>
-        </summary>
-        <div class="myte-block-inner">
-          <div class="myte-week-rows">
-            ${["Mon", "Tue", "Wed", "Thu", "Fri"]
-      .map(
-        (d, i) => `
-              <div class="myte-week-row">
-                <div class="myte-week-label">${d}</div>
-                <select data-day-index="${i}" class="myte-week-select">
-                  <option value="HW">Homeworking</option>
-                  <option value="Office">Office / Client</option>
-                  <option value="None">None</option>
-                </select>
-                <span class="myte-week-emoji" data-day-emoji="${i}">🏠</span>
-              </div>
-            `
-      )
-      .join("")}
-          </div>
-
-          <label class="myte-checkbox">
-            <input type="checkbox" id="myte-auto-rest" />
-            Auto-check daily & weekly rest
-          </label>
-        </div>
-      </details>
-
-      <div id="myte-bottom-bar">
-        <button id="myte-fill-btn-fixed" class="myte-btn myte-btn-primary">
-          Fill Timesheet
-        </button>
-      </div>
-    </div>
-  `;
-
+  const panel = tplRoot.cloneNode(true);
   document.body.appendChild(panel);
   state.panel = panel;
 
   wirePanelEvents();
   applyConfigToUI();
   applyThemeClass();
+  updateWbsCountLabel();
+  autoLoadWbsIfNeeded();
 
   return panel;
 }
@@ -689,10 +740,122 @@ function togglePanel() {
   if (state.panel) {
     removePanel();
   } else {
-    createPanel();
+    createPanel(); // returns a Promise but we don't need to await
   }
 }
 
+
+/***********************
+ * WBS list rendering
+ ***********************/
+function renderWbsList() {
+  if (!state.panel) return;
+
+  const container = state.panel.querySelector("#myte-wbs-list");
+  if (!container) return;
+
+  const cfg = state.config;
+  const available = cfg.availableWbs || [];
+  const allocations = cfg.wbsAllocations || [];
+  const favoriteCodes = cfg.favoriteWbs || [];
+  const filter = (state.wbsFilter || "").toLowerCase().trim();
+
+  container.innerHTML = "";
+
+  if (!allocations.length) {
+    const info = document.createElement("div");
+    info.className = "myte-empty";
+    info.textContent =
+      "No WBS configured yet. Reload WBS from page, then add lines and choose WBS + weights.";
+    container.appendChild(info);
+    updateWeightSummary();
+    return;
+  }
+
+  const matchesFilter = (w) => {
+    if (!filter) return true;
+    const code = (w.code || "").toLowerCase();
+    const desc = (w.description || "").toLowerCase();
+    return code.includes(filter) || desc.includes(filter);
+  };
+
+  allocations.forEach((alloc, index) => {
+    const row = document.createElement("div");
+    row.className = "myte-wbs-row";
+
+    const favList = [];
+    const otherList = [];
+
+    available.forEach((w) => {
+      const isFav = favoriteCodes.includes(w.code);
+      if (isFav) favList.push(w);
+      else otherList.push(w);
+    });
+
+    let optionsList = favList.filter(matchesFilter).concat(
+      otherList.filter(matchesFilter)
+    );
+
+    const current = available.find((w) => w.code === alloc.code);
+    if (current && !optionsList.some((w) => w.code === current.code)) {
+      optionsList.unshift(current);
+    }
+
+    const wbsOptions = optionsList
+      .map((w) => {
+        const isFav = favoriteCodes.includes(w.code);
+        const labelPrefix = isFav ? "★ " : "";
+        return `<option value="${w.code}">${labelPrefix}${w.code} – ${w.description}</option>`;
+      })
+      .join("");
+
+    row.innerHTML = `
+      <select class="myte-wbs-select" data-index="${index}">
+        <option value="">Select WBS</option>
+        ${wbsOptions}
+      </select>
+      <input
+        type="number"
+        step="0.1"
+        min="0"
+        class="myte-wbs-weight"
+        data-index="${index}"
+        placeholder="Weight"
+      />
+      <button class="myte-wbs-fav" data-index="${index}" title="Toggle favorite">☆</button>
+      <button class="myte-wbs-remove" data-index="${index}" title="Remove">✕</button>
+    `;
+
+    container.appendChild(row);
+
+    const select = row.querySelector(".myte-wbs-select");
+    const weightInput = row.querySelector(".myte-wbs-weight");
+    const favBtn = row.querySelector(".myte-wbs-fav");
+
+    if (select) select.value = alloc.code || "";
+    if (weightInput && typeof alloc.weight !== "undefined") {
+      weightInput.value = alloc.weight;
+    }
+
+    const isFav =
+      alloc.code && favoriteCodes && favoriteCodes.includes(alloc.code);
+    if (favBtn) {
+      if (isFav) {
+        favBtn.classList.add("myte-wbs-fav-active");
+        favBtn.textContent = "★";
+      } else {
+        favBtn.classList.remove("myte-wbs-fav-active");
+        favBtn.textContent = "☆";
+      }
+    }
+  });
+
+  updateWeightSummary();
+}
+
+/***********************
+ * Apply config to UI
+ ***********************/
 function applyConfigToUI() {
   if (!state.panel) return;
 
@@ -713,67 +876,14 @@ function applyConfigToUI() {
   });
 
   renderWbsList();
+  updateWbsCountLabel();
+  updateWbsButtonLabel();
   applyThemeClass();
 }
 
-function renderWbsList() {
-  if (!state.panel) return;
-
-  const container = state.panel.querySelector("#myte-wbs-list");
-  if (!container) return;
-
-  const cfg = state.config;
-  const available = cfg.availableWbs || [];
-  const allocations = cfg.wbsAllocations || [];
-
-  container.innerHTML = "";
-
-  if (!allocations.length) {
-    const info = document.createElement("div");
-    info.className = "myte-empty";
-    info.textContent =
-      "No WBS configured yet. Load WBS from page, then add lines and choose WBS + weights.";
-    container.appendChild(info);
-    return;
-  }
-
-  allocations.forEach((alloc, index) => {
-    const row = document.createElement("div");
-    row.className = "myte-wbs-row";
-
-    const wbsOptions = available
-      .map(
-        (w) =>
-          `<option value="${w.code}">${w.code} – ${w.description}</option>`
-      )
-      .join("");
-
-    row.innerHTML = `
-      <select class="myte-wbs-select" data-index="${index}">
-        <option value="">Select WBS</option>
-        ${wbsOptions}
-      </select>
-      <input
-        type="number"
-        step="0.1"
-        min="0"
-        class="myte-wbs-weight"
-        data-index="${index}"
-        placeholder="Weight"
-      />
-      <button class="myte-wbs-remove" data-index="${index}" title="Remove">✕</button>
-    `;
-
-    container.appendChild(row);
-
-    const select = row.querySelector(".myte-wbs-select");
-    const weightInput = row.querySelector(".myte-wbs-weight");
-
-    if (select) select.value = alloc.code || "";
-    if (weightInput) weightInput.value = alloc.weight ?? "";
-  });
-}
-
+/***********************
+ * Panel events
+ ***********************/
 function wirePanelEvents() {
   if (!state.panel) return;
 
@@ -789,17 +899,22 @@ function wirePanelEvents() {
       applyThemeClass();
     });
 
+  // Reload WBS button
   state.panel
     .querySelector("#myte-load-wbs")
     ?.addEventListener("click", async () => {
       const btn = state.panel.querySelector("#myte-load-wbs");
       if (btn) {
         btn.disabled = true;
-        btn.textContent = "Loading WBS...";
+        const labelSpan = btn.querySelector(".myte-btn-label");
+        if (labelSpan) {
+          labelSpan.textContent = "Loading WBS…";
+        }
       }
       try {
         const wbs = await extractAllActiveWbsFromPage();
         state.config.availableWbs = wbs;
+        updateWbsCountLabel();
         if (!state.config.wbsAllocations.length && wbs.length) {
           state.config.wbsAllocations = [{ code: wbs[0].code, weight: 1 }];
         }
@@ -808,9 +923,38 @@ function wirePanelEvents() {
       } finally {
         if (btn) {
           btn.disabled = false;
-          btn.textContent = "Load WBS from page";
+          updateWbsButtonLabel();
         }
       }
+    });
+
+  // Search WBS
+  state.panel
+    .querySelector("#myte-wbs-search")
+    ?.addEventListener("input", (e) => {
+      state.wbsFilter = e.target.value || "";
+      renderWbsList();
+    });
+
+  // Normalize weights
+  state.panel
+    .querySelector("#myte-normalize-weights")
+    ?.addEventListener("click", () => {
+      const allocations = state.config.wbsAllocations || [];
+      const total = allocations.reduce(
+        (sum, a) => sum + Number(a.weight || 0),
+        0
+      );
+      if (!total) {
+        showToast("Cannot normalize: total weight is 0.", "error");
+        return;
+      }
+      allocations.forEach((a) => {
+        a.weight = Number(a.weight || 0) / total;
+      });
+      saveConfig();
+      renderWbsList();
+      showToast("Weights normalized to sum 1.0.", "success");
     });
 
   state.panel
@@ -849,6 +993,7 @@ function wirePanelEvents() {
 
   const wbsContainer = state.panel.querySelector("#myte-wbs-list");
 
+  // Changes inside WBS list
   wbsContainer.addEventListener("change", (e) => {
     if (e.target.classList.contains("myte-wbs-select")) {
       const idx = Number(e.target.dataset.index);
@@ -856,24 +1001,49 @@ function wirePanelEvents() {
       if (!state.config.wbsAllocations[idx]) return;
       state.config.wbsAllocations[idx].code = value;
       saveConfig();
+      renderWbsList();
     } else if (e.target.classList.contains("myte-wbs-weight")) {
       const idx = Number(e.target.dataset.index);
       const value = Number(e.target.value) || 0;
       if (!state.config.wbsAllocations[idx]) return;
       state.config.wbsAllocations[idx].weight = value;
       saveConfig();
+      updateWeightSummary();
     }
   });
 
+  // Clicks inside WBS list (remove / favorite)
   wbsContainer.addEventListener("click", (e) => {
     if (e.target.classList.contains("myte-wbs-remove")) {
       const idx = Number(e.target.dataset.index);
       state.config.wbsAllocations.splice(idx, 1);
       saveConfig();
       renderWbsList();
+    } else if (e.target.classList.contains("myte-wbs-fav")) {
+      const idx = Number(e.target.dataset.index);
+      const row = e.target.closest(".myte-wbs-row");
+      if (!row) return;
+      const select = row.querySelector(".myte-wbs-select");
+      if (!select || !select.value) {
+        showToast("Select a WBS before marking it as favorite.", "info");
+        return;
+      }
+
+      const code = select.value;
+      const favs = state.config.favoriteWbs || [];
+      const indexInFavs = favs.indexOf(code);
+      if (indexInFavs === -1) {
+        favs.push(code);
+      } else {
+        favs.splice(indexInFavs, 1);
+      }
+      state.config.favoriteWbs = favs;
+      saveConfig();
+      renderWbsList();
     }
   });
 
+  // Fill button
   state.panel
     .querySelector("#myte-fill-btn-fixed")
     ?.addEventListener("click", async () => {
@@ -892,7 +1062,7 @@ function wirePanelEvents() {
           applyWeeklyPatternAndRest(state.config);
           showToast("Timesheet filled successfully!", "success");
           await wait(350);
-          removePanel();     // ← Auto-close panel
+          removePanel();
         }
       } catch (err) {
         console.error(err);
@@ -922,5 +1092,7 @@ chrome.runtime.onMessage.addListener((msg) => {
   if (state.initialized) return;
   state.initialized = true;
 
+  // Only load config. WBS auto-load is now triggered
+  // *only* when the panel is opened via autoLoadWbsIfNeeded().
   await loadConfig();
 })();
