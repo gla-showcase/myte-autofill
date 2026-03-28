@@ -342,6 +342,27 @@ test.describe("content.js smoke tests", () => {
     await attachSuccessfulArtifacts(page, testInfo, "autocomplete-favorites", browserOutput);
   });
 
+  test("displays the correct panel subtitle text", async ({ page }, testInfo) => {
+    const browserOutput = collectBrowserOutput(page);
+    await installExtensionHarness(page, {
+      dailyHours: 7.5,
+      weeklyPattern: {},
+      wbsAllocations: [],
+      availableWbs: [],
+      favoriteWbs: [],
+      autoCheckRest: false,
+      themeStyle: "corporate"
+    });
+
+    await openPanel(page);
+    const subtitleText = await page.locator(".myte-subtitle").innerText();
+    expect(subtitleText.trim()).toBe(
+      "Autofill Accenture MyTE timesheets with multi-WBS allocations and homeworking/office patterns."
+    );
+
+    await attachSuccessfulArtifacts(page, testInfo, "panel-subtitle", browserOutput);
+  });
+
   test("persists theme selection after closing and reopening the panel", async ({ page }, testInfo) => {
     const browserOutput = collectBrowserOutput(page);
     await installExtensionHarness(page, {
