@@ -193,6 +193,19 @@ describe("content.js scenarios", () => {
     expect(document.querySelectorAll("#myte-helper-panel")).toHaveLength(1);
   });
 
+  it("renders the correct subtitle text in the panel", async () => {
+    const { api } = await openPanelWithStorage({
+      availableWbs: [],
+      wbsAllocations: [{ code: "WBS-1", weight: 1 }]
+    });
+
+    const subtitle = api.state.panel.querySelector(".myte-subtitle");
+    expect(subtitle).not.toBeNull();
+    expect(subtitle.textContent.trim()).toBe(
+      "Autofill Accenture MyTE timesheets with multi-WBS allocations and homeworking/office patterns."
+    );
+  });
+
   it("fills a multi-WBS week with exact rounded hours", async () => {
     const { api } = await loadContentScript();
     buildHoursGrid();
