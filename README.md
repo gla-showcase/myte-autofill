@@ -1,6 +1,6 @@
 # MyTE Autofill Helper
 
-Autofill Accenture MyTE timesheets with multi-WBS allocations & HW/Office patterns.
+Autofill Accenture MyTE timesheets with multi-WBS allocations and homeworking/office patterns.
 
 ![Chrome Web Store](https://img.shields.io/badge/Chrome_Extension-Available-blue?logo=googlechrome&logoColor=white)
 ![Edge Add-ons](https://img.shields.io/badge/Edge_Add--ons-Pending-blue?logo=microsoftedge&logoColor=white)
