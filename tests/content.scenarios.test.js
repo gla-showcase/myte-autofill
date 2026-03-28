@@ -217,7 +217,7 @@ describe("content.js scenarios", () => {
     }
   });
 
-  it("retries the first cold-start day cell when the initial insert is ignored", async () => {
+  it("falls back to input events when the first cold-start day cell ignores execCommand", async () => {
     const { api } = await loadContentScript();
     buildHoursGrid();
 
@@ -225,8 +225,12 @@ describe("content.js scenarios", () => {
       '#entryGridHoursCell-0-1 [contenteditable="true"]'
     );
     let focusedElement = null;
-    let ignoredFirstInsert = false;
+    let firstEditorInputEvents = 0;
     const originalFocus = HTMLElement.prototype.focus;
+
+    firstEditor.addEventListener("input", () => {
+      firstEditorInputEvents += 1;
+    });
 
     Object.defineProperty(HTMLElement.prototype, "focus", {
       configurable: true,
@@ -246,8 +250,7 @@ describe("content.js scenarios", () => {
         if (command === "delete") {
           focusedElement.textContent = "";
         } else if (command === "insertText") {
-          if (focusedElement === firstEditor && !ignoredFirstInsert) {
-            ignoredFirstInsert = true;
+          if (focusedElement === firstEditor) {
             return true;
           }
           focusedElement.textContent = String(value ?? "");
@@ -267,6 +270,7 @@ describe("content.js scenarios", () => {
 
     expect(success).toBe(true);
     expect(firstEditor.textContent).toBe("1.9");
+    expect(firstEditorInputEvents).toBeGreaterThan(0);
 
     for (let dayIndex = 0; dayIndex < 5; dayIndex += 1) {
       expect(

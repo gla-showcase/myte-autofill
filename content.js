@@ -128,6 +128,29 @@ function pressTab(el) {
   );
 }
 
+function dispatchEditableInput(editableDiv, text) {
+  const inputEventOptions = {
+    bubbles: true,
+    cancelable: true,
+    data: text,
+    inputType: "insertText"
+  };
+
+  if (typeof InputEvent === "function") {
+    editableDiv.dispatchEvent(new InputEvent("beforeinput", inputEventOptions));
+  } else {
+    editableDiv.dispatchEvent(new Event("beforeinput", { bubbles: true, cancelable: true }));
+  }
+
+  editableDiv.textContent = text;
+
+  if (typeof InputEvent === "function") {
+    editableDiv.dispatchEvent(new InputEvent("input", inputEventOptions));
+  } else {
+    editableDiv.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+}
+
 async function fillEditableDiv(editableDiv, text) {
   const desiredText = String(text);
 
@@ -142,6 +165,14 @@ async function fillEditableDiv(editableDiv, text) {
 
     await wait(8);
     if (editableDiv.textContent.trim() === desiredText) break;
+  }
+
+  if (editableDiv.textContent.trim() !== desiredText) {
+    editableDiv.click();
+    await wait(24);
+    editableDiv.focus();
+    dispatchEditableInput(editableDiv, desiredText);
+    await wait(8);
   }
 
   pressTab(editableDiv);
