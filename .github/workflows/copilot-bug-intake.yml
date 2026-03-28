@@ -245,6 +245,8 @@ jobs:
 
       - name: Assign issue to Copilot coding agent
         if: steps.validate.outputs.valid == 'true' && steps.token.outputs.configured == 'true'
+        id: assign
+        continue-on-error: true
         uses: actions/github-script@v8
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
@@ -290,8 +292,61 @@ jobs:
               }
             });
 
+      - name: Mark assignment failure as blocked
+        if: steps.validate.outputs.valid == 'true' && steps.token.outputs.configured == 'true' && steps.assign.outcome != 'success'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const marker = '<!-- copilot-bug-assignment-failed -->';
+            const issue_number = context.payload.issue.number;
+            const body = [
+              marker,
+              'Copilot bug intake could not assign this issue to the coding agent.',
+              '',
+              'The issue has been moved to `agent:blocked` instead of remaining in a running state.',
+              '',
+              'Retry by re-adding the `agent:ready` label after the underlying GitHub Copilot issue is resolved.'
+            ].join('\n');
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number
+            });
+
+            const existing = comments.find((comment) => comment.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number,
+                body
+              });
+            }
+
+            const currentLabels = context.payload.issue.labels.map((label) => label.name);
+            const nextLabels = [...new Set([
+              ...currentLabels.filter((label) => !['agent:queued', 'agent:running', 'agent:ready'].includes(label)),
+              'agent:blocked'
+            ])];
+
+            await github.rest.issues.setLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+              labels: nextLabels
+            });
+
       - name: Mark issue as running
-        if: steps.validate.outputs.valid == 'true' && steps.token.outputs.configured == 'true'
+        if: steps.validate.outputs.valid == 'true' && steps.token.outputs.configured == 'true' && steps.assign.outcome == 'success'
         uses: actions/github-script@v8
         with:
           script: |

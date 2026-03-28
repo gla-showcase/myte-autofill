@@ -1,0 +1,77 @@
+name: Copilot Bug Agent Failure
+
+on:
+  issue_comment:
+    types: [created, edited]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  issues: write
+
+jobs:
+  recover:
+    if: >-
+      github.event.issue.pull_request == null &&
+      github.event.comment.user.login == 'Copilot' &&
+      contains(github.event.comment.body, 'The agent encountered an error and was unable to start working on this issue')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Mark startup failure as blocked
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const marker = '<!-- copilot-bug-agent-start-failed -->';
+            const issue_number = context.payload.issue.number;
+            const body = [
+              marker,
+              'Copilot accepted this issue but failed before opening a draft pull request.',
+              '',
+              'The issue has been moved to `agent:blocked` so it does not stay stuck in `agent:running`.',
+              '',
+              'Retry by re-adding the `agent:ready` label after the Copilot service issue clears.'
+            ].join('\n');
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number
+            });
+
+            const existing = comments.find((comment) => comment.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number,
+                body
+              });
+            }
+
+            const issue = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number
+            });
+
+            const nextLabels = [...new Set([
+              ...issue.data.labels.map((label) => label.name).filter((label) => !['agent:queued', 'agent:running', 'agent:ready'].includes(label)),
+              'agent:blocked'
+            ])];
+
+            await github.rest.issues.setLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+              labels: nextLabels
+            });
