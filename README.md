@@ -8,7 +8,9 @@ Autofill Accenture MyTE timesheets with multi-WBS allocations and homeworking/of
 ![Status](https://img.shields.io/badge/Status-Active-brightgreen)
 ![Version](https://img.shields.io/badge/Version-1.3.0-purple)
 
-⚠️ This is an independent helper tool.  
+<img width="1400" height="933" alt="marquee-promo-tile-1400x560 png" src="https://github.com/user-attachments/assets/de0b8adc-c3d2-4f52-be44-0cfa90b37de0" />
+
+⚠️ Disclamer: This is an independent helper tool.  
 It is **not** affiliated with, sponsored by, or endorsed by **Accenture** or the official **MyTE** product team.
 
 ---
