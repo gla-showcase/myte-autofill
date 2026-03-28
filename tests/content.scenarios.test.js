@@ -225,9 +225,13 @@ describe("content.js scenarios", () => {
       '#entryGridHoursCell-0-1 [contenteditable="true"]'
     );
     let focusedElement = null;
+    let firstEditorBeforeInputEvents = 0;
     let firstEditorInputEvents = 0;
     const originalFocus = HTMLElement.prototype.focus;
 
+    firstEditor.addEventListener("beforeinput", () => {
+      firstEditorBeforeInputEvents += 1;
+    });
     firstEditor.addEventListener("input", () => {
       firstEditorInputEvents += 1;
     });
@@ -270,6 +274,7 @@ describe("content.js scenarios", () => {
 
     expect(success).toBe(true);
     expect(firstEditor.textContent).toBe("1.9");
+    expect(firstEditorBeforeInputEvents).toBeGreaterThan(0);
     expect(firstEditorInputEvents).toBeGreaterThan(0);
 
     for (let dayIndex = 0; dayIndex < 5; dayIndex += 1) {

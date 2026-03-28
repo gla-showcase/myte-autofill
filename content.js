@@ -3,6 +3,8 @@
  *************************************************/
 
 const MYTE_STORAGE_KEY = "myteAutofillConfig";
+const EDITABLE_FILL_DELAY_MS = 8;
+const EDITABLE_FALLBACK_DELAY_MS = 24;
 
 const defaultConfig = {
   dailyHours: 7.7,
@@ -156,23 +158,23 @@ async function fillEditableDiv(editableDiv, text) {
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     editableDiv.click();
-    await wait(attempt === 0 ? 8 : 24);
+    await wait(attempt === 0 ? EDITABLE_FILL_DELAY_MS : EDITABLE_FALLBACK_DELAY_MS);
 
     editableDiv.focus();
     document.execCommand("selectAll", false, null);
     document.execCommand("delete", false, null);
     document.execCommand("insertText", false, desiredText);
 
-    await wait(8);
+    await wait(EDITABLE_FILL_DELAY_MS);
     if (editableDiv.textContent.trim() === desiredText) break;
   }
 
   if (editableDiv.textContent.trim() !== desiredText) {
     editableDiv.click();
-    await wait(24);
+    await wait(EDITABLE_FALLBACK_DELAY_MS);
     editableDiv.focus();
     dispatchEditableInput(editableDiv, desiredText);
-    await wait(8);
+    await wait(EDITABLE_FILL_DELAY_MS);
   }
 
   pressTab(editableDiv);
