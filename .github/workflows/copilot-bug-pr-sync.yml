@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   sync:
-    if: ${{ github.event.pull_request.user.login == 'copilot-swe-agent[bot]' }}
+    if: ${{ github.event.pull_request.user.login == 'copilot-swe-agent[bot]' || github.event.pull_request.user.login == 'Copilot' }}
     runs-on: ubuntu-latest
 
     steps:
