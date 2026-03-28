@@ -129,15 +129,21 @@ function pressTab(el) {
 }
 
 async function fillEditableDiv(editableDiv, text) {
-  editableDiv.click();
-  await wait(8);
+  const desiredText = String(text);
 
-  editableDiv.focus();
-  document.execCommand("selectAll", false, null);
-  document.execCommand("delete", false, null);
-  document.execCommand("insertText", false, String(text));
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    editableDiv.click();
+    await wait(attempt === 0 ? 8 : 24);
 
-  await wait(8);
+    editableDiv.focus();
+    document.execCommand("selectAll", false, null);
+    document.execCommand("delete", false, null);
+    document.execCommand("insertText", false, desiredText);
+
+    await wait(8);
+    if (editableDiv.textContent.trim() === desiredText) break;
+  }
+
   pressTab(editableDiv);
 }
 

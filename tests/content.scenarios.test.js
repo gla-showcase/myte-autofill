@@ -217,6 +217,67 @@ describe("content.js scenarios", () => {
     }
   });
 
+  it("retries the first cold-start day cell when the initial insert is ignored", async () => {
+    const { api } = await loadContentScript();
+    buildHoursGrid();
+
+    const firstEditor = document.querySelector(
+      '#entryGridHoursCell-0-1 [contenteditable="true"]'
+    );
+    let focusedElement = null;
+    let ignoredFirstInsert = false;
+    const originalFocus = HTMLElement.prototype.focus;
+
+    Object.defineProperty(HTMLElement.prototype, "focus", {
+      configurable: true,
+      writable: true,
+      value() {
+        focusedElement = this;
+        return originalFocus.call(this);
+      }
+    });
+
+    Object.defineProperty(document, "execCommand", {
+      configurable: true,
+      writable: true,
+      value: vi.fn((command, _showUi, value) => {
+        if (!focusedElement) return true;
+
+        if (command === "delete") {
+          focusedElement.textContent = "";
+        } else if (command === "insertText") {
+          if (focusedElement === firstEditor && !ignoredFirstInsert) {
+            ignoredFirstInsert = true;
+            return true;
+          }
+          focusedElement.textContent = String(value ?? "");
+        }
+
+        return true;
+      })
+    });
+
+    const success = await api.fillTimesheetWithConfig({
+      dailyHours: 7.7,
+      wbsAllocations: [
+        { code: "WBS-1", weight: 0.25 },
+        { code: "WBS-2", weight: 0.75 }
+      ]
+    });
+
+    expect(success).toBe(true);
+    expect(firstEditor.textContent).toBe("1.9");
+
+    for (let dayIndex = 0; dayIndex < 5; dayIndex += 1) {
+      expect(
+        document.querySelector(`#entryGridHoursCell-${dayIndex}-1 [contenteditable="true"]`).textContent
+      ).toBe("1.9");
+      expect(
+        document.querySelector(`#entryGridHoursCell-${dayIndex}-2 [contenteditable="true"]`).textContent
+      ).toBe("5.8");
+    }
+  });
+
   it("applies weekly pattern and rest checkboxes while skipping special cells", async () => {
     const { api } = await loadContentScript();
     buildCategoryGrid();
