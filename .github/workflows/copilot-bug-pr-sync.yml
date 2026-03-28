@@ -1,0 +1,134 @@
+name: Copilot Bug PR Sync
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, closed]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  issues: write
+  pull-requests: read
+
+jobs:
+  sync:
+    if: ${{ github.event.pull_request.user.login == 'copilot-swe-agent[bot]' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Sync analysis and outcome back to the issue
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const body = pr.body || '';
+            const issueMatch = body.match(/(?:fixes|closes|resolves)\s+#(\d+)/i);
+
+            if (!issueMatch) {
+              core.info('No linked issue reference found in the PR body.');
+              return;
+            }
+
+            const issueNumber = Number(issueMatch[1]);
+            const marker = `<!-- copilot-bug-sync:pr-${pr.number} -->`;
+
+            function extractSection(title) {
+              const pattern = new RegExp(`##\\s+${title}\\s*([\\s\\S]*?)(?=\\n##\\s+|$)`, 'i');
+              const match = body.match(pattern);
+              return match ? match[1].trim() : '';
+            }
+
+            const investigation = extractSection('Investigation Summary');
+            const rootCause = extractSection('Root Cause');
+            const proposedFix = extractSection('Proposed Fix');
+            const validation = extractSection('Validation');
+            const risks = extractSection('Risks');
+
+            let statusLine = `Draft PR #${pr.number} is linked to this bug: ${pr.html_url}`;
+            if (context.payload.action === 'ready_for_review') {
+              statusLine = `PR #${pr.number} is ready for review: ${pr.html_url}`;
+            } else if (context.payload.action === 'converted_to_draft') {
+              statusLine = `PR #${pr.number} moved back to draft: ${pr.html_url}`;
+            } else if (context.payload.action === 'synchronize') {
+              statusLine = `Copilot pushed more changes to PR #${pr.number}: ${pr.html_url}`;
+            } else if (context.payload.action === 'closed' && pr.merged) {
+              statusLine = `PR #${pr.number} was merged: ${pr.html_url}`;
+            } else if (context.payload.action === 'closed') {
+              statusLine = `PR #${pr.number} was closed without merge: ${pr.html_url}`;
+            }
+
+            const commentLines = [marker, statusLine, ''];
+
+            if (investigation) {
+              commentLines.push('## Investigation Summary', investigation, '');
+            }
+            if (rootCause) {
+              commentLines.push('## Root Cause', rootCause, '');
+            }
+            if (proposedFix) {
+              commentLines.push('## Proposed Fix', proposedFix, '');
+            }
+            if (validation) {
+              commentLines.push('## Validation', validation, '');
+            }
+            if (risks) {
+              commentLines.push('## Risks', risks, '');
+            }
+
+            const commentBody = commentLines.join('\n').trim();
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber
+            });
+
+            const existing = comments.find((comment) => comment.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: commentBody
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                body: commentBody
+              });
+            }
+
+            const issue = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber
+            });
+
+            const labelSet = new Set(issue.data.labels.map((label) => label.name));
+            labelSet.delete('agent:queued');
+
+            if (context.payload.action === 'opened' || context.payload.action === 'reopened' || context.payload.action === 'synchronize' || context.payload.action === 'ready_for_review' || context.payload.action === 'converted_to_draft') {
+              labelSet.delete('agent:blocked');
+              labelSet.delete('agent:done');
+              labelSet.add('agent:running');
+              labelSet.add('agent:pr-opened');
+            }
+
+            if (context.payload.action === 'closed' && pr.merged) {
+              labelSet.delete('agent:running');
+              labelSet.delete('agent:blocked');
+              labelSet.add('agent:done');
+            } else if (context.payload.action === 'closed') {
+              labelSet.delete('agent:running');
+              labelSet.add('agent:blocked');
+            }
+
+            await github.rest.issues.setLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              labels: [...labelSet]
+            });

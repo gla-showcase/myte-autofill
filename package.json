@@ -1,0 +1,20 @@
+{
+  "name": "myte-autofill",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:smoke": "playwright test",
+    "test:smoke:headed": "playwright test --headed",
+    "test:smoke:ui": "playwright test --ui",
+    "test:smoke:report": "playwright show-report playwright-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@vitest/coverage-v8": "^3.2.4",
+    "jsdom": "^26.1.0",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,345 @@
+name: Copilot Bug Intake
+
+on:
+  issues:
+    types: [opened, reopened, edited, labeled]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: copilot-bug-intake-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  investigate:
+    if: >-
+      github.event.issue.pull_request == null &&
+      (
+        contains(github.event.issue.labels.*.name, 'bug') ||
+        contains(github.event.issue.labels.*.name, 'agent:ready')
+      ) &&
+      !contains(github.event.issue.labels.*.name, 'agent:running') &&
+      !contains(github.event.issue.labels.*.name, 'agent:pr-opened') &&
+      !contains(github.event.issue.labels.*.name, 'agent:done')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ensure agent labels exist
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const labels = [
+              {
+                name: 'agent:queued',
+                color: 'c2e0ff',
+                description: 'Queued for Copilot investigation'
+              },
+              {
+                name: 'agent:running',
+                color: '0e8a16',
+                description: 'Copilot is currently investigating this issue'
+              },
+              {
+                name: 'agent:needs-info',
+                color: 'fbca04',
+                description: 'The issue needs more detail before Copilot can act'
+              },
+              {
+                name: 'agent:pr-opened',
+                color: '5319e7',
+                description: 'A Copilot draft PR is linked to this issue'
+              },
+              {
+                name: 'agent:blocked',
+                color: 'b60205',
+                description: 'Copilot automation is blocked and needs maintainer action'
+              },
+              {
+                name: 'agent:ready',
+                color: '1d76db',
+                description: 'Maintainer-approved retry for Copilot bug intake'
+              },
+              {
+                name: 'agent:done',
+                color: '0052cc',
+                description: 'Copilot-linked fix was merged'
+              }
+            ];
+
+            for (const label of labels) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name
+                });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ...label
+                });
+              }
+            }
+
+      - name: Validate issue body
+        id: validate
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const body = context.payload.issue.body || '';
+            const required = [
+              'Bug Description',
+              'To Reproduce',
+              'Expected Behavior',
+              'Environment'
+            ];
+
+            const missing = required.filter((section) => !body.includes(section));
+            core.setOutput('valid', missing.length === 0 ? 'true' : 'false');
+            core.setOutput('missing', missing.join(', '));
+
+      - name: Check Copilot token configuration
+        id: token
+        shell: bash
+        env:
+          COPILOT_AGENT_TOKEN: ${{ secrets.COPILOT_AGENT_TOKEN }}
+        run: |
+          if [ -n "$COPILOT_AGENT_TOKEN" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Mark issue as needing more detail
+        if: steps.validate.outputs.valid != 'true'
+        uses: actions/github-script@v8
+        env:
+          MISSING: ${{ steps.validate.outputs.missing }}
+        with:
+          script: |
+            const marker = '<!-- copilot-bug-needs-info -->';
+            const body = [
+              marker,
+              'Copilot bug intake is blocked because the report is missing required details.',
+              '',
+              `Missing sections: ${process.env.MISSING}`,
+              '',
+              'Update the issue, then add the `agent:ready` label to retry the automation.'
+            ].join('\n');
+
+            const issue_number = context.payload.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number
+            });
+
+            const existing = comments.find((comment) => comment.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number,
+                body
+              });
+            }
+
+            const currentLabels = context.payload.issue.labels.map((label) => label.name);
+            const nextLabels = [...new Set([
+              ...currentLabels.filter((label) => !['agent:queued', 'agent:running', 'agent:blocked', 'agent:ready'].includes(label)),
+              'agent:needs-info'
+            ])];
+
+            await github.rest.issues.setLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+              labels: nextLabels
+            });
+
+      - name: Mark missing token configuration
+        if: steps.validate.outputs.valid == 'true' && steps.token.outputs.configured != 'true'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const marker = '<!-- copilot-bug-token-missing -->';
+            const body = [
+              marker,
+              'Copilot bug intake is blocked because the repository secret `COPILOT_AGENT_TOKEN` is not configured.',
+              '',
+              'Add a user-scoped token with read/write access to Actions, Contents, Issues, and Pull requests, then add the `agent:ready` label to retry.'
+            ].join('\n');
+
+            const issue_number = context.payload.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number
+            });
+
+            const existing = comments.find((comment) => comment.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number,
+                body
+              });
+            }
+
+            const currentLabels = context.payload.issue.labels.map((label) => label.name);
+            const nextLabels = [...new Set([
+              ...currentLabels.filter((label) => !['agent:queued', 'agent:running', 'agent:ready'].includes(label)),
+              'agent:blocked'
+            ])];
+
+            await github.rest.issues.setLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+              labels: nextLabels
+            });
+
+      - name: Queue issue for Copilot
+        if: steps.validate.outputs.valid == 'true' && steps.token.outputs.configured == 'true'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const issue_number = context.payload.issue.number;
+            const currentLabels = context.payload.issue.labels.map((label) => label.name);
+            const nextLabels = [...new Set([
+              ...currentLabels.filter((label) => !['agent:needs-info', 'agent:blocked', 'agent:ready', 'agent:done'].includes(label)),
+              'agent:queued'
+            ])];
+
+            await github.rest.issues.setLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+              labels: nextLabels
+            });
+
+      - name: Assign issue to Copilot coding agent
+        if: steps.validate.outputs.valid == 'true' && steps.token.outputs.configured == 'true'
+        uses: actions/github-script@v8
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          COPILOT_BUG_BASE_BRANCH: ${{ vars.COPILOT_BUG_BASE_BRANCH }}
+          COPILOT_BUG_CUSTOM_AGENT: ${{ vars.COPILOT_BUG_CUSTOM_AGENT }}
+          COPILOT_BUG_MODEL: ${{ vars.COPILOT_BUG_MODEL }}
+        with:
+          github-token: ${{ secrets.COPILOT_AGENT_TOKEN }}
+          script: |
+            const issue = context.payload.issue;
+            const targetRepo = `${context.repo.owner}/${context.repo.repo}`;
+            const baseBranch = process.env.COPILOT_BUG_BASE_BRANCH || process.env.DEFAULT_BRANCH;
+            const agentAssignment = {
+              target_repo: targetRepo,
+              base_branch: baseBranch,
+              custom_instructions: [
+                'Investigate this bug deeply before changing code.',
+                'Preserve the repository constraints from AGENTS.md and .github/instructions/myte-extension.instructions.md.',
+                'Prefer the smallest safe fix and avoid unrelated refactors.',
+                'Add focused automated tests when the bug can be reproduced safely.',
+                'Use the repository custom agent `Bug Investigation Specialist` if `COPILOT_BUG_CUSTOM_AGENT` is configured.',
+                'Your pull request body must include these sections in order:',
+                `Fixes #${issue.number}`,
+                '## Investigation Summary',
+                '## Root Cause',
+                '## Proposed Fix',
+                '## Validation',
+                '## Risks'
+              ].join('\n'),
+              custom_agent: process.env.COPILOT_BUG_CUSTOM_AGENT || undefined,
+              model: process.env.COPILOT_BUG_MODEL || undefined
+            };
+
+            await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/assignees', {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              assignees: ['copilot-swe-agent[bot]'],
+              agent_assignment: agentAssignment,
+              headers: {
+                accept: 'application/vnd.github+json',
+                'x-github-api-version': '2022-11-28'
+              }
+            });
+
+      - name: Mark issue as running
+        if: steps.validate.outputs.valid == 'true' && steps.token.outputs.configured == 'true'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const marker = '<!-- copilot-bug-started -->';
+            const issue_number = context.payload.issue.number;
+            const body = [
+              marker,
+              'Copilot has been assigned to investigate this bug and prepare a draft pull request.',
+              '',
+              'Expected flow:',
+              '- root-cause investigation',
+              '- draft PR creation',
+              '- issue status sync from the PR body and lifecycle'
+            ].join('\n');
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number
+            });
+
+            const existing = comments.find((comment) => comment.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number,
+                body
+              });
+            }
+
+            const currentLabels = context.payload.issue.labels.map((label) => label.name);
+            const nextLabels = [...new Set([
+              ...currentLabels.filter((label) => !['agent:queued', 'agent:needs-info', 'agent:blocked', 'agent:ready'].includes(label)),
+              'agent:running'
+            ])];
+
+            await github.rest.issues.setLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+              labels: nextLabels
+            });

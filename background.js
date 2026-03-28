@@ -1,7 +1,6 @@
-// When the user clicks the extension icon
-chrome.action.onClicked.addListener((tab) => {
+function handleActionClick(chromeApi, tab) {
   // Get the real active tab (MV3 service worker cannot trust the click's tab param in all cases)
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+  chromeApi.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const active = tabs[0];
     const url = active?.url || "";
 
@@ -11,10 +10,21 @@ chrome.action.onClicked.addListener((tab) => {
 
     if (isMyTe && active.id) {
       // On MyTE: toggle in-page panel
-      chrome.tabs.sendMessage(active.id, { type: "TOGGLE_MYTE_PANEL" });
+      chromeApi.tabs.sendMessage(active.id, { type: "TOGGLE_MYTE_PANEL" });
     } else {
       // Not on MyTE: open MyTE time page in a new tab
-      chrome.tabs.create({ url: "https://myte.accenture.com/#/time" });
+      chromeApi.tabs.create({ url: "https://myte.accenture.com/#/time" });
     }
   });
+}
+
+// When the user clicks the extension icon
+chrome.action.onClicked.addListener((tab) => {
+  handleActionClick(chrome, tab);
 });
+
+if (globalThis.__MYTE_TEST_MODE__) {
+  globalThis.__MYTE_BACKGROUND_TEST_API__ = {
+    handleActionClick
+  };
+}

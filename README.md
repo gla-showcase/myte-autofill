@@ -1,5 +1,6 @@
-# MyTE Autofill Helper  
-**Autofill Accenture MyTE timesheets with multi-WBS allocations & HW/Office patterns**
+# MyTE Autofill Helper
+
+Autofill Accenture MyTE timesheets with multi-WBS allocations & HW/Office patterns.
 
 ![Chrome Web Store](https://img.shields.io/badge/Chrome_Extension-Available-blue?logo=googlechrome&logoColor=white)
 ![Edge Add-ons](https://img.shields.io/badge/Edge_Add--ons-Pending-blue?logo=microsoftedge&logoColor=white)
@@ -141,7 +142,7 @@ The tool is **not official Accenture software**.
 
 ### Folder Structure
 
-```
+```text
 myte-autofill/
 ├── manifest.json
 ├── background.js
@@ -174,6 +175,7 @@ Create the Chrome package with:
 ```
 
 This produces:
+
 - `dist/myte-autofill-<version>-chrome.zip`
 - `dist/chrome-package-<version>/`
 - `dist/myte-autofill-<version>-chrome-contents.txt`
@@ -181,6 +183,54 @@ This produces:
 
 The zip artifact is ready for the Chrome Web Store and contains only the extension payload at the archive root.
 The generated release notes summarize product-impacting changes since the previous version tag and are intended for merge-to-main release prep.
+
+### Automated Tests
+
+Install the dev-only test tooling with:
+
+```powershell
+npm install
+```
+
+Run the automated tests with:
+
+```powershell
+npm test
+```
+
+Run the browser smoke tests with Playwright after installing Chromium once:
+
+```powershell
+npx playwright install chromium
+npm run test:smoke
+```
+
+Run them locally with a visible browser window:
+
+```powershell
+npm run test:smoke:headed
+```
+
+Run them in Playwright UI mode for interactive local debugging:
+
+```powershell
+npm run test:smoke:ui
+```
+
+Generate a local coverage report with:
+
+```powershell
+npm run test:coverage
+```
+
+The current automated suite covers pure allocation logic, panel lifecycle behavior, MyTE-like DOM scenarios for hour filling, weekly pattern application, WBS autocomplete and favorites, popup-based WBS extraction, and the background action routing logic. A separate Playwright smoke suite runs the real content script in Chromium against a fake MyTE page to verify panel opening, hour filling, and popup-based WBS loading end to end. The live MyTE site still requires a manual smoke test after major DOM automation changes.
+
+### Test Outputs
+
+- `npm test`: Vitest results are printed in the terminal. There is no persistent report file unless you run coverage.
+- `npm run test:coverage`: coverage outputs are written under `coverage/`.
+- `npm run test:smoke`: Playwright writes the HTML report to `playwright-report/`, JSON results to `test-results/playwright/results.json`, and per-test traces/videos/artifacts to `test-results/playwright/artifacts/`.
+- Open the Playwright HTML report with `npm run test:smoke:report`.
 
 ### GitHub Actions
 
@@ -196,6 +246,46 @@ The repository also includes a release workflow at `.github/workflows/release-ch
 - Push a tag like `v1.2.3`
 - The workflow validates that the tag version matches `manifest.json`, builds the package, creates a GitHub Release, and attaches the zip, contents manifest, and generated release notes
 
+The repository also includes Copilot bug automation workflows:
+
+- `.github/workflows/copilot-bug-intake.yml`: validates new bug issues, applies agent labels, and assigns valid issues to GitHub Copilot coding agent
+- `.github/workflows/copilot-bug-pr-sync.yml`: mirrors Copilot PR investigation details and lifecycle updates back to the original issue
+
+### Copilot Bug Automation Setup
+
+To enable automated bug investigation with GitHub Copilot:
+
+1. Enable GitHub Copilot coding agent for this repository in the organization or repository settings.
+2. Add a repository secret named `COPILOT_AGENT_TOKEN`.
+3. Use a user-scoped token that can assign issues to Copilot.
+
+Recommended fine-grained token permissions:
+
+- Metadata: read
+- Actions: read and write
+- Contents: read and write
+- Issues: read and write
+- Pull requests: read and write
+
+Optional repository variables:
+
+- `COPILOT_BUG_BASE_BRANCH`: override the branch Copilot should target instead of the default branch
+- `COPILOT_BUG_MODEL`: request a specific Copilot coding agent model
+- `COPILOT_BUG_CUSTOM_AGENT`: set the custom agent identifier if you want issue assignment to use a repository custom agent instead of the default coding agent
+
+The workflow expects Copilot-created pull requests to include these sections in the PR body:
+
+- `Fixes #<issue-number>`
+- `## Investigation Summary`
+- `## Root Cause`
+- `## Proposed Fix`
+- `## Validation`
+- `## Risks`
+
+The included repository custom agent at `.github/agents/bug-investigation-specialist.agent.md` is designed to produce that structure.
+
+GitHub MCP is optional here. The issue-to-Copilot workflow uses GitHub's native issue assignment API and does not require MCP. If you want to start Copilot tasks from an IDE or another host instead of issue assignment, GitHub MCP can be enabled separately for `create_pull_request_with_copilot` workflows.
+
 ---
 
 ## 💬 Feedback & Contributions
@@ -209,6 +299,3 @@ Pull requests should preserve the extension’s **single purpose**:
 ## 📄 License
 
 MIT License.
-
-
-

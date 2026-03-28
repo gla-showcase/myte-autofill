@@ -7,6 +7,8 @@ assignees: ''
 
 ---
 
+Bug reports with clear reproduction details may be automatically assigned to GitHub Copilot for investigation and a draft fix PR.
+
 ## 🐛 Bug Description
 
 A clear and concise description of what the bug is.
@@ -51,3 +53,4 @@ Add any other context about the problem here:
 - Does it happen consistently or intermittently?
 - Did it work in a previous version?
 - Any console errors? (F12 → Console tab)
+- If you attach a screenshot, include the visible URL and any error toast or popup state

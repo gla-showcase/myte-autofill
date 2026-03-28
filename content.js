@@ -1436,11 +1436,107 @@ chrome.runtime.onMessage.addListener((msg) => {
 /***********************
  * INIT
  ***********************/
-(async function init() {
+async function init() {
   if (state.initialized) return;
   state.initialized = true;
 
   // Only load config. WBS auto-load is now triggered
   // *only* when the panel is opened via autoLoadWbsIfNeeded().
   await loadConfig();
-})();
+}
+
+function resetTestState(configOverrides = {}) {
+  state.config = {
+    ...defaultConfig,
+    ...configOverrides,
+    weeklyPattern: {
+      ...defaultConfig.weeklyPattern,
+      ...(configOverrides.weeklyPattern || {})
+    },
+    wbsAllocations: Array.isArray(configOverrides.wbsAllocations)
+      ? configOverrides.wbsAllocations.map((allocation) => ({ ...allocation }))
+      : [],
+    availableWbs: Array.isArray(configOverrides.availableWbs)
+      ? configOverrides.availableWbs.map((wbs) => ({ ...wbs }))
+      : [],
+    favoriteWbs: Array.isArray(configOverrides.favoriteWbs)
+      ? [...configOverrides.favoriteWbs]
+      : []
+  };
+  state.panel = null;
+  state.initialized = false;
+  state.wbsFilter = "";
+  state.panelTemplate = null;
+  state.panelCreationPromise = null;
+  state.panelOpenRequested = false;
+  state.activeWbsPickerIndex = null;
+  state.wbsDrafts = {};
+  state.isSelectingWbsOption = false;
+}
+
+function exposeTestApi() {
+  if (!globalThis.__MYTE_TEST_MODE__) return;
+
+  globalThis.__MYTE_TEST_API__ = {
+    MYTE_STORAGE_KEY,
+    defaultConfig,
+    state,
+    loadPanelTemplate,
+    loadConfig,
+    saveConfig,
+    wait,
+    pressTab,
+    fillEditableDiv,
+    showToast,
+    userSetCheckbox,
+    isActiveWbsRow,
+    extractWbsRow,
+    ensureWbsPopupOpenForButton,
+    scrollWbsPopupToLoadAll,
+    closeWbsPopup,
+    waitForChargeCodeOpener,
+    extractAllActiveWbsFromPage,
+    findGridRowIndexByCode,
+    ensureWbsInRowByCode,
+    getWorkingDayIndices,
+    computeDailyHoursPerWbs,
+    fillTimesheetWithConfig,
+    applyWeeklyPatternAndRest,
+    applyThemeClass,
+    updateWbsButtonLabel,
+    updateWbsCountLabel,
+    autoLoadWbsIfNeeded,
+    updateWeekEmoji,
+    roundWeight,
+    formatWbsLabel,
+    escapeHtml,
+    findWbsByPickerValue,
+    getWbsMetaMarkup,
+    getOrderedWbsOptions,
+    filterWbsOptions,
+    closeWbsAutocomplete,
+    renderWbsAutocomplete,
+    selectWbsForRow,
+    normalizeWeightsToTwoDecimals,
+    getWeekdayLabel,
+    getWorkLocationLabel,
+    getNextWorkLocationMode,
+    setWeeklyPatternDay,
+    updateWeightSummary,
+    validateWbsConfigForFill,
+    createPanel,
+    removePanel,
+    togglePanel,
+    renderWbsList,
+    applyConfigToUI,
+    wirePanelEvents,
+    init,
+    resetTestState
+  };
+}
+
+exposeTestApi();
+
+if (!globalThis.__MYTE_DISABLE_AUTO_INIT__) {
+  init();
+}
