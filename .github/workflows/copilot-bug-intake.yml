@@ -20,6 +20,12 @@ jobs:
     if: >-
       github.event.issue.pull_request == null &&
       contains(github.event.issue.labels.*.name, 'bug') &&
+      (
+        github.event.action == 'opened' ||
+        github.event.action == 'reopened' ||
+        (github.event.action == 'labeled' && (github.event.label.name == 'bug' || github.event.label.name == 'agent:ready')) ||
+        (github.event.action == 'edited' && contains(github.event.issue.labels.*.name, 'agent:ready'))
+      ) &&
       !contains(github.event.issue.labels.*.name, 'agent:running') &&
       !contains(github.event.issue.labels.*.name, 'agent:pr-opened') &&
       !contains(github.event.issue.labels.*.name, 'agent:done')
