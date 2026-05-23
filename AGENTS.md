@@ -73,6 +73,8 @@ At a repo level, keep these constraints in mind:
 
 ## Specialized Agents
 
+- [Bug Investigation Specialist](.github/agents/bug-investigation-specialist.agent.md): use for bug reports, root-cause analysis, minimal bug fixes, and PR bodies that sync bug analysis back to issues.
+- [Feature Feasibility Specialist](.github/agents/feature-feasibility-specialist.agent.md): use for feature requests, scope and feasibility review, and draft PRs or structured issue feedback for requests that should not be implemented.
 - [Chrome Extension MV3 Developer](.github/agents/chrome-extension-mv3-developer.agent.md): use for `manifest.json`, `background.js`, `content.js`, DOM automation, panel behavior, and MV3 runtime debugging.
 - [Chrome Web Store Release Manager](.github/agents/chrome-web-store-release.agent.md): use for version bumps, packaging, release notes, store-readiness checks, and Chrome Web Store submission prep.
 
@@ -85,5 +87,6 @@ At a repo level, keep these constraints in mind:
 
 - "Implement a new WBS search behavior in the panel without adding any framework."
 - "Debug why WBS extraction misses rows from the popup grid."
+- "Review this feature request for scope and feasibility, then open a draft PR only if the change is safe and aligned with the extension purpose."
 - "Add Vitest coverage for the panel lifecycle in content.js."
 - "Prepare the next Chrome package and summarize the release notes impact."

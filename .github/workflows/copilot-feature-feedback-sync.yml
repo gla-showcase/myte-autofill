@@ -1,0 +1,71 @@
+name: Copilot Feature Feedback Sync
+
+on:
+  issue_comment:
+    types: [created, edited]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  issues: write
+
+jobs:
+  sync:
+    if: >-
+      github.event.issue.pull_request == null &&
+      contains(github.event.issue.labels.*.name, 'enhancement') &&
+      !contains(github.event.issue.labels.*.name, 'bug') &&
+      contains(fromJson('["Copilot","copilot-swe-agent[bot]"]'), github.event.comment.user.login) &&
+      contains(github.event.comment.body, '<!-- copilot-feature-review -->')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Sync structured feature feedback labels
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const body = context.payload.comment.body || '';
+            const statusMatch = body.match(/^Status:\s*(needs-info|not-feasible|blocked)\s*$/im);
+
+            if (!statusMatch) {
+              core.info('No supported feature status marker found.');
+              return;
+            }
+
+            const status = statusMatch[1].toLowerCase();
+            const issue_number = context.payload.issue.number;
+            const issue = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number
+            });
+            const labelSet = new Set(issue.data.labels.map((label) => label.name));
+
+            labelSet.delete('agent:queued');
+            labelSet.delete('agent:running');
+            labelSet.delete('agent:ready');
+
+            if (status === 'needs-info') {
+              labelSet.delete('agent:blocked');
+              labelSet.delete('agent:pr-opened');
+              labelSet.delete('agent:done');
+              labelSet.add('agent:needs-info');
+            } else if (status === 'not-feasible') {
+              labelSet.delete('agent:blocked');
+              labelSet.delete('agent:needs-info');
+              labelSet.delete('agent:pr-opened');
+              labelSet.add('agent:done');
+            } else if (status === 'blocked') {
+              labelSet.delete('agent:needs-info');
+              labelSet.delete('agent:pr-opened');
+              labelSet.delete('agent:done');
+              labelSet.add('agent:blocked');
+            }
+
+            await github.rest.issues.setLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+              labels: [...labelSet]
+            });

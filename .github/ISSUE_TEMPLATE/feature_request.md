@@ -7,6 +7,8 @@ assignees: ''
 
 ---
 
+Feature requests with clear scope may be automatically assigned to GitHub Copilot for a feasibility review. If implementation is safe and in scope, Copilot may open a draft pull request. Otherwise, it will leave structured feedback in this issue.
+
 ## 💡 Feature Description
 
 A clear and concise description of the feature you'd like to see.

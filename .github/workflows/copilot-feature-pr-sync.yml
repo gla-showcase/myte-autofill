@@ -1,4 +1,4 @@
-name: Copilot Bug PR Sync
+name: Copilot Feature PR Sync
 
 on:
   pull_request_target:
@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Sync analysis and outcome back to the issue
+      - name: Sync feasibility and outcome back to the issue
         uses: actions/github-script@v8
         with:
           script: |
@@ -38,12 +38,12 @@ jobs:
             });
             const issueLabels = new Set(issue.data.labels.map((label) => label.name));
 
-            if (!issueLabels.has('bug')) {
-              core.info('Linked issue is not labeled `bug`; skipping bug sync.');
+            if (!issueLabels.has('enhancement') || issueLabels.has('bug')) {
+              core.info('Linked issue is not a feature request; skipping feature sync.');
               return;
             }
 
-            const marker = `<!-- copilot-bug-sync:pr-${pr.number} -->`;
+            const marker = `<!-- copilot-feature-sync:pr-${pr.number} -->`;
 
             function extractSection(title) {
               const pattern = new RegExp(`##\\s+${title}\\s*([\\s\\S]*?)(?=\\n##\\s+|$)`, 'i');
@@ -51,35 +51,35 @@ jobs:
               return match ? match[1].trim() : '';
             }
 
-            const investigation = extractSection('Investigation Summary');
-            const rootCause = extractSection('Root Cause');
-            const proposedFix = extractSection('Proposed Fix');
+            const feasibility = extractSection('Feasibility Assessment');
+            const recommendation = extractSection('Recommendation');
+            const implementation = extractSection('Proposed Implementation');
             const validation = extractSection('Validation');
             const risks = extractSection('Risks');
 
-            let statusLine = `Draft PR #${pr.number} is linked to this bug: ${pr.html_url}`;
+            let statusLine = `Draft PR #${pr.number} is linked to this feature request: ${pr.html_url}`;
             if (context.payload.action === 'ready_for_review') {
-              statusLine = `PR #${pr.number} is ready for review: ${pr.html_url}`;
+              statusLine = `PR #${pr.number} for this feature request is ready for review: ${pr.html_url}`;
             } else if (context.payload.action === 'converted_to_draft') {
-              statusLine = `PR #${pr.number} moved back to draft: ${pr.html_url}`;
+              statusLine = `PR #${pr.number} for this feature request moved back to draft: ${pr.html_url}`;
             } else if (context.payload.action === 'synchronize') {
-              statusLine = `Copilot pushed more changes to PR #${pr.number}: ${pr.html_url}`;
+              statusLine = `Copilot pushed more changes to PR #${pr.number} for this feature request: ${pr.html_url}`;
             } else if (context.payload.action === 'closed' && pr.merged) {
-              statusLine = `PR #${pr.number} was merged: ${pr.html_url}`;
+              statusLine = `PR #${pr.number} for this feature request was merged: ${pr.html_url}`;
             } else if (context.payload.action === 'closed') {
-              statusLine = `PR #${pr.number} was closed without merge: ${pr.html_url}`;
+              statusLine = `PR #${pr.number} for this feature request was closed without merge: ${pr.html_url}`;
             }
 
             const commentLines = [marker, statusLine, ''];
 
-            if (investigation) {
-              commentLines.push('## Investigation Summary', investigation, '');
+            if (feasibility) {
+              commentLines.push('## Feasibility Assessment', feasibility, '');
             }
-            if (rootCause) {
-              commentLines.push('## Root Cause', rootCause, '');
+            if (recommendation) {
+              commentLines.push('## Recommendation', recommendation, '');
             }
-            if (proposedFix) {
-              commentLines.push('## Proposed Fix', proposedFix, '');
+            if (implementation) {
+              commentLines.push('## Proposed Implementation', implementation, '');
             }
             if (validation) {
               commentLines.push('## Validation', validation, '');
@@ -119,6 +119,7 @@ jobs:
             if (context.payload.action === 'opened' || context.payload.action === 'reopened' || context.payload.action === 'synchronize' || context.payload.action === 'ready_for_review' || context.payload.action === 'converted_to_draft') {
               labelSet.delete('agent:blocked');
               labelSet.delete('agent:done');
+              labelSet.delete('agent:needs-info');
               labelSet.add('agent:running');
               labelSet.add('agent:pr-opened');
             }
@@ -126,6 +127,7 @@ jobs:
             if (context.payload.action === 'closed' && pr.merged) {
               labelSet.delete('agent:running');
               labelSet.delete('agent:blocked');
+              labelSet.delete('agent:needs-info');
               labelSet.add('agent:done');
             } else if (context.payload.action === 'closed') {
               labelSet.delete('agent:running');

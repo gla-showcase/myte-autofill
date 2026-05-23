@@ -6,7 +6,7 @@ Autofill Accenture MyTE timesheets with multi-WBS allocations and homeworking/of
 ![Edge Add-ons](https://img.shields.io/badge/Edge_Add--ons-Pending-blue?logo=microsoftedge&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 ![Status](https://img.shields.io/badge/Status-Active-brightgreen)
-![Version](https://img.shields.io/badge/Version-1.3.0-purple)
+![Version](https://img.shields.io/badge/Version-1.4.0-purple)
 
 <img width="1400" height="933" alt="marquee-promo-tile-1400x560 png" src="https://github.com/user-attachments/assets/de0b8adc-c3d2-4f52-be44-0cfa90b37de0" />
 
@@ -252,10 +252,18 @@ The repository also includes Copilot bug automation workflows:
 
 - `.github/workflows/copilot-bug-intake.yml`: validates new bug issues, applies agent labels, and assigns valid issues to GitHub Copilot coding agent
 - `.github/workflows/copilot-bug-pr-sync.yml`: mirrors Copilot PR investigation details and lifecycle updates back to the original issue
+- `.github/workflows/copilot-bug-agent-failure.yml`: moves startup failures to `agent:blocked` so bug issues do not remain stuck in `agent:running`
 
-### Copilot Bug Automation Setup
+The repository also includes Copilot feature automation workflows:
 
-To enable automated bug investigation with GitHub Copilot:
+- `.github/workflows/copilot-feature-intake.yml`: validates new feature requests, applies agent labels, and assigns valid requests to GitHub Copilot for feasibility review
+- `.github/workflows/copilot-feature-pr-sync.yml`: mirrors Copilot PR feasibility details and lifecycle updates back to the original feature request
+- `.github/workflows/copilot-feature-feedback-sync.yml`: reacts to structured Copilot issue feedback when a feature request should not produce a PR
+- `.github/workflows/copilot-feature-agent-failure.yml`: moves startup failures to `agent:blocked` so feature requests do not remain stuck in `agent:running`
+
+### Copilot Issue Automation Setup
+
+To enable automated bug investigation and feature feasibility review with GitHub Copilot:
 
 1. Enable GitHub Copilot coding agent for this repository in the organization or repository settings.
 2. Add a repository secret named `COPILOT_AGENT_TOKEN`.
@@ -274,8 +282,11 @@ Optional repository variables:
 - `COPILOT_BUG_BASE_BRANCH`: override the branch Copilot should target instead of the default branch
 - `COPILOT_BUG_MODEL`: request a specific Copilot coding agent model
 - `COPILOT_BUG_CUSTOM_AGENT`: set the custom agent identifier if you want issue assignment to use a repository custom agent instead of the default coding agent
+- `COPILOT_FEATURE_BASE_BRANCH`: override the branch Copilot should target for feature work instead of the default branch
+- `COPILOT_FEATURE_MODEL`: request a specific Copilot coding agent model for feature reviews
+- `COPILOT_FEATURE_CUSTOM_AGENT`: set the custom agent identifier if you want feature requests to use a repository custom agent instead of the default coding agent
 
-The workflow expects Copilot-created pull requests to include these sections in the PR body:
+Bug workflow PRs are expected to include these sections in the PR body:
 
 - `Fixes #<issue-number>`
 - `## Investigation Summary`
@@ -284,7 +295,25 @@ The workflow expects Copilot-created pull requests to include these sections in 
 - `## Validation`
 - `## Risks`
 
-The included repository custom agent at `.github/agents/bug-investigation-specialist.agent.md` is designed to produce that structure.
+Feature workflow PRs are expected to include these sections in the PR body:
+
+- `Closes #<issue-number>`
+- `## Feasibility Assessment`
+- `## Recommendation`
+- `## Proposed Implementation`
+- `## Validation`
+- `## Risks`
+
+If a feature request is not feasible or needs more detail, Copilot is expected to leave an issue comment that includes:
+
+- `<!-- copilot-feature-review -->`
+- `Status: needs-info` or `Status: not-feasible`
+- `## Feasibility Assessment`
+- `## Recommendation`
+- `## Blocking Factors`
+- `## Suggested Next Steps`
+
+The included repository custom agents at `.github/agents/bug-investigation-specialist.agent.md` and `.github/agents/feature-feasibility-specialist.agent.md` are designed to produce those structures.
 
 GitHub MCP is optional here. The issue-to-Copilot workflow uses GitHub's native issue assignment API and does not require MCP. If you want to start Copilot tasks from an IDE or another host instead of issue assignment, GitHub MCP can be enabled separately for `create_pull_request_with_copilot` workflows.
 

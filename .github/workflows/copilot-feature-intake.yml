@@ -1,4 +1,4 @@
-name: Copilot Bug Intake
+name: Copilot Feature Intake
 
 on:
   issues:
@@ -12,14 +12,15 @@ permissions:
   issues: write
 
 concurrency:
-  group: copilot-bug-intake-${{ github.event.issue.number }}
+  group: copilot-feature-intake-${{ github.event.issue.number }}
   cancel-in-progress: false
 
 jobs:
   investigate:
     if: >-
       github.event.issue.pull_request == null &&
-      contains(github.event.issue.labels.*.name, 'bug') &&
+      contains(github.event.issue.labels.*.name, 'enhancement') &&
+      !contains(github.event.issue.labels.*.name, 'bug') &&
       !contains(github.event.issue.labels.*.name, 'agent:running') &&
       !contains(github.event.issue.labels.*.name, 'agent:pr-opened') &&
       !contains(github.event.issue.labels.*.name, 'agent:done')
@@ -93,10 +94,10 @@ jobs:
           script: |
             const body = context.payload.issue.body || '';
             const required = [
-              'Bug Description',
-              'To Reproduce',
-              'Expected Behavior',
-              'Environment'
+              'Feature Description',
+              'Problem It Solves',
+              'Proposed Solution',
+              'Scope & Compatibility'
             ];
 
             const missing = required.filter((section) => !body.includes(section));
@@ -122,10 +123,10 @@ jobs:
           MISSING: ${{ steps.validate.outputs.missing }}
         with:
           script: |
-            const marker = '<!-- copilot-bug-needs-info -->';
+            const marker = '<!-- copilot-feature-needs-info -->';
             const body = [
               marker,
-              'Copilot bug intake is blocked because the report is missing required details.',
+              'Copilot feature intake is blocked because the request is missing required details.',
               '',
               `Missing sections: ${process.env.MISSING}`,
               '',
@@ -175,10 +176,10 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const marker = '<!-- copilot-bug-token-missing -->';
+            const marker = '<!-- copilot-feature-token-missing -->';
             const body = [
               marker,
-              'Copilot bug intake is blocked because the repository secret `COPILOT_AGENT_TOKEN` is not configured.',
+              'Copilot feature intake is blocked because the repository secret `COPILOT_AGENT_TOKEN` is not configured.',
               '',
               'Add a user-scoped token with read/write access to Actions, Contents, Issues, and Pull requests, then add the `agent:ready` label to retry.'
             ].join('\n');
@@ -247,34 +248,41 @@ jobs:
         uses: actions/github-script@v8
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          COPILOT_BUG_BASE_BRANCH: ${{ vars['COPILOT_BUG_BASE_BRANCH'] }}
-          COPILOT_BUG_CUSTOM_AGENT: ${{ vars['COPILOT_BUG_CUSTOM_AGENT'] }}
-          COPILOT_BUG_MODEL: ${{ vars['COPILOT_BUG_MODEL'] }}
+          COPILOT_FEATURE_BASE_BRANCH: ${{ vars['COPILOT_FEATURE_BASE_BRANCH'] }}
+          COPILOT_FEATURE_CUSTOM_AGENT: ${{ vars['COPILOT_FEATURE_CUSTOM_AGENT'] }}
+          COPILOT_FEATURE_MODEL: ${{ vars['COPILOT_FEATURE_MODEL'] }}
         with:
           github-token: ${{ secrets.COPILOT_AGENT_TOKEN }}
           script: |
             const issue = context.payload.issue;
             const targetRepo = `${context.repo.owner}/${context.repo.repo}`;
-            const baseBranch = process.env.COPILOT_BUG_BASE_BRANCH || process.env.DEFAULT_BRANCH;
+            const baseBranch = process.env.COPILOT_FEATURE_BASE_BRANCH || process.env.DEFAULT_BRANCH;
             const agentAssignment = {
               target_repo: targetRepo,
               base_branch: baseBranch,
               custom_instructions: [
-                'Investigate this bug deeply before changing code.',
+                'Review this feature request against the extension purpose and repository constraints before changing code.',
                 'Preserve the repository constraints from AGENTS.md and .github/instructions/myte-extension.instructions.md.',
-                'Prefer the smallest safe fix and avoid unrelated refactors.',
-                'Add focused automated tests when the bug can be reproduced safely.',
-                'Use the repository custom agent `Bug Investigation Specialist` if `COPILOT_BUG_CUSTOM_AGENT` is configured.',
-                'Your pull request body must include these sections in order:',
-                `Fixes #${issue.number}`,
-                '## Investigation Summary',
-                '## Root Cause',
-                '## Proposed Fix',
+                'Reject or defer requests that would broaden the extension beyond safe, accurate MyTE timesheet automation, require risky permissions, or rely on brittle DOM shortcuts.',
+                'If the request is feasible, implement the smallest safe version and add focused automated tests when practical.',
+                'If the request is not ready or not feasible, do not open a pull request. Instead, post exactly one issue comment that includes these lines and headings in order:',
+                '<!-- copilot-feature-review -->',
+                'Status: needs-info or not-feasible',
+                '## Feasibility Assessment',
+                '## Recommendation',
+                '## Blocking Factors',
+                '## Suggested Next Steps',
+                'If you do open a pull request, your pull request body must include these sections in order:',
+                `Closes #${issue.number}`,
+                '## Feasibility Assessment',
+                '## Recommendation',
+                '## Proposed Implementation',
                 '## Validation',
-                '## Risks'
+                '## Risks',
+                'Use the repository custom agent `Feature Feasibility Specialist` if `COPILOT_FEATURE_CUSTOM_AGENT` is configured.'
               ].join('\n'),
-              custom_agent: process.env.COPILOT_BUG_CUSTOM_AGENT || undefined,
-              model: process.env.COPILOT_BUG_MODEL || undefined
+              custom_agent: process.env.COPILOT_FEATURE_CUSTOM_AGENT || undefined,
+              model: process.env.COPILOT_FEATURE_MODEL || undefined
             };
 
             await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/assignees', {
@@ -294,11 +302,11 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const marker = '<!-- copilot-bug-assignment-failed -->';
+            const marker = '<!-- copilot-feature-assignment-failed -->';
             const issue_number = context.payload.issue.number;
             const body = [
               marker,
-              'Copilot bug intake could not assign this issue to the coding agent.',
+              'Copilot feature intake could not assign this issue to the coding agent.',
               '',
               'The issue has been moved to `agent:blocked` instead of remaining in a running state.',
               '',
@@ -347,16 +355,16 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const marker = '<!-- copilot-bug-started -->';
+            const marker = '<!-- copilot-feature-started -->';
             const issue_number = context.payload.issue.number;
             const body = [
               marker,
-              'Copilot has been assigned to investigate this bug and prepare a draft pull request.',
+              'Copilot has been assigned to assess this feature request and determine whether a safe implementation should be proposed.',
               '',
               'Expected flow:',
-              '- root-cause investigation',
-              '- draft PR creation',
-              '- issue status sync from the PR body and lifecycle'
+              '- feasibility review against repository scope and constraints',
+              '- structured issue feedback if no PR should be opened',
+              '- draft PR creation and issue sync if implementation is justified'
             ].join('\n');
 
             const comments = await github.paginate(github.rest.issues.listComments, {
