@@ -118,6 +118,30 @@ jobs:
           destination_dir: ${{ steps.target.outputs.dir }}
           keep_files: true
 
+      - name: Prepare root index redirect
+        run: |
+          mkdir -p gh-pages-root
+          cat > gh-pages-root/index.html <<'HTML'
+          <!doctype html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <meta http-equiv="refresh" content="0; url=./main/">
+              <title>MyTE Autofill - Playwright reports</title>
+            </head>
+            <body>
+              <p>Redirecting to the latest <a href="./main/">main branch Playwright report</a>...</p>
+            </body>
+          </html>
+          HTML
+
+      - name: Publish root index to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: gh-pages-root
+          keep_files: true
+
       - name: Publish preview link
         run: |
           {
