@@ -2,11 +2,11 @@
 
 Autofill Accenture MyTE timesheets with multi-WBS allocations and homeworking/office patterns.
 
-![Chrome Web Store](https://img.shields.io/badge/Chrome_Extension-Available-blue?logo=googlechrome&logoColor=white)
+[![Chrome Web Store](https://img.shields.io/badge/Chrome_Extension-Available-blue?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/myte-autofill-helper/dfpohbobkklfchohecohngodhagffhib)
 ![Edge Add-ons](https://img.shields.io/badge/Edge_Add--ons-Pending-blue?logo=microsoftedge&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 ![Status](https://img.shields.io/badge/Status-Active-brightgreen)
-![Version](https://img.shields.io/badge/Version-1.3.0-purple)
+![Version](https://img.shields.io/badge/Version-1.4.1-purple)
 
 <img width="1400" height="933" alt="marquee-promo-tile-1400x560 png" src="https://github.com/user-attachments/assets/de0b8adc-c3d2-4f52-be44-0cfa90b37de0" />
 
@@ -165,7 +165,7 @@ myte-autofill/
 Update the version and rebuild the package in one step with:
 
 ```powershell
-./scripts/bump-version.ps1 -Version 1.3.1
+./scripts/bump-version.ps1 -Version X.Y.Z
 ```
 
 This updates `manifest.json`, refreshes the README version badge, and rebuilds the Chrome package unless you pass `-SkipPackage`.

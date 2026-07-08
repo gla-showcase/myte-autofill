@@ -15,6 +15,7 @@ const defaultConfig = {
     3: "Office",
     4: "HW"
   },
+  weeklyPatternEnabled: true,
   autoCheckRest: true,
   themeStyle: "corporate", // 'corporate' | 'dev'
   wbsAllocations: [],
@@ -118,6 +119,76 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function normalizeText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function parseLocalizedHourValue(value) {
+  const normalized = normalizeText(value).replace(/\s+/g, "");
+  if (!/^\d+(?:[.,]\d+)?$/.test(normalized)) {
+    return null;
+  }
+
+  const parsed = Number(normalized.replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function areEquivalentHourValues(actualValue, expectedValue) {
+  const actual = parseLocalizedHourValue(actualValue);
+  const expected = parseLocalizedHourValue(expectedValue);
+
+  return actual !== null && expected !== null && Math.abs(actual - expected) < 0.0001;
+}
+
+function formatHoursForInput(value, fallback = defaultConfig.dailyHours) {
+  const parsed = parseLocalizedHourValue(value);
+  const fallbackParsed = parseLocalizedHourValue(fallback);
+  const hours = parsed ?? fallbackParsed ?? defaultConfig.dailyHours;
+
+  return hours.toFixed(1);
+}
+
+function normalizeHoursInputValue(input) {
+  if (!input) return null;
+
+  const nextValue = input.value.replace(/,/g, ".");
+  if (input.value !== nextValue) {
+    input.value = nextValue;
+  }
+
+  return nextValue;
+}
+
+function getGridRoot() {
+  return (
+    document.querySelector('[aria-label="Time Entry Grid"]') ||
+    document.querySelector('.ag-root[role="grid"]') ||
+    null
+  );
+}
+
+function nextFrame() {
+  return new Promise((resolve) => {
+    if (typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(() => resolve());
+      return;
+    }
+
+    window.setTimeout(resolve, 16);
+  });
+}
+
+async function advanceFrames(count) {
+  for (let frame = 0; frame < count; frame += 1) {
+    await nextFrame();
+  }
+}
+
 function pressTab(el) {
   el.dispatchEvent(
     new KeyboardEvent("keydown", {
@@ -129,19 +200,270 @@ function pressTab(el) {
       cancelable: true
     })
   );
+
+  el.dispatchEvent(
+    new KeyboardEvent("keyup", {
+      key: "Tab",
+      code: "Tab",
+      keyCode: 9,
+      which: 9,
+      bubbles: true
+    })
+  );
+}
+
+function isTextInputElement(element) {
+  return (
+    !!element &&
+    typeof element.matches === "function" &&
+    element.matches('input:not([type="hidden"]):not([disabled]), textarea:not([disabled])')
+  );
+}
+
+function getHourCellContainer(node) {
+  if (!node) return null;
+
+  if (node.id && node.id.startsWith("entryGridHoursCell-")) {
+    return document.getElementById(node.id) || node;
+  }
+
+  const closestHourCell = node.closest?.('[id^="entryGridHoursCell-"]');
+  if (closestHourCell) {
+    return closestHourCell;
+  }
+
+  if (node.id && node.id.startsWith("hours-cell-")) {
+    return document.getElementById(
+      node.id.replace(/^hours-cell-/, "entryGridHoursCell-")
+    );
+  }
+
+  return null;
+}
+
+function getTargetCellKey(node) {
+  return getHourCellContainer(node)?.id || node?.id || null;
+}
+
+function findEditableNodeInHourCell(hourCell) {
+  if (!hourCell) return null;
+
+  const activeElement = document.activeElement;
+  if (
+    hourCell.classList.contains("ag-cell-inline-editing") &&
+    isTextInputElement(activeElement)
+  ) {
+    return activeElement;
+  }
+
+  const contentEditableNodes = Array.from(
+    hourCell.querySelectorAll('[contenteditable="true"]')
+  );
+  const contentEditableNode = contentEditableNodes.find(
+    (node) => node.getAttribute("aria-disabled") !== "true"
+  );
+  if (contentEditableNode) {
+    return contentEditableNode;
+  }
+
+  return (
+    hourCell.querySelector(
+      'input:not([type="hidden"]):not([disabled]), textarea:not([disabled])'
+    ) || null
+  );
+}
+
+function getEditableDisplayNode(editableDiv) {
+  if (!editableDiv || isTextInputElement(editableDiv)) {
+    return null;
+  }
+
+  return editableDiv.querySelector('span[aria-hidden="true"]');
+}
+
+function getEditableDisplayText(editableDiv) {
+  const target = getLiveEditableTarget(editableDiv) || editableDiv;
+
+  if (isTextInputElement(target)) {
+    return normalizeText(target.value);
+  }
+
+  const displayNode = getEditableDisplayNode(target);
+  if (displayNode) {
+    return normalizeText(displayNode.textContent);
+  }
+
+  const hourCell = getHourCellContainer(target);
+  if (hourCell) {
+    const liveInput = hourCell.querySelector(
+      'input:not([type="hidden"]):not([disabled]), textarea:not([disabled])'
+    );
+    if (isTextInputElement(liveInput)) {
+      return normalizeText(liveInput.value);
+    }
+
+    const hourDisplayNode = hourCell.querySelector(
+      '[id^="hours-cell-"] span[aria-hidden="true"]'
+    );
+    if (hourDisplayNode) {
+      return normalizeText(hourDisplayNode.textContent);
+    }
+
+    const hourDisplay = hourCell.querySelector('[id^="hours-cell-"]');
+    if (hourDisplay) {
+      return normalizeText(hourDisplay.textContent);
+    }
+  }
+
+  return normalizeText(target.textContent);
+}
+
+function getLiveEditableTarget(editableDiv) {
+  if (!editableDiv) return null;
+
+  const currentTarget = editableDiv.id
+    ? document.getElementById(editableDiv.id) || editableDiv
+    : editableDiv;
+
+  if (isTextInputElement(currentTarget)) {
+    return currentTarget;
+  }
+
+  if (
+    currentTarget.getAttribute?.("contenteditable") === "true" &&
+    currentTarget.getAttribute("aria-disabled") !== "true"
+  ) {
+    return currentTarget;
+  }
+
+  return findEditableNodeInHourCell(getHourCellContainer(currentTarget));
+}
+
+function requireExecCommand() {
+  if (typeof document.execCommand !== "function") {
+    throw new Error("document.execCommand is not available in this browser context.");
+  }
+}
+
+function forceCommitCell(editableDiv) {
+  const target = getLiveEditableTarget(editableDiv);
+  if (!target) return false;
+
+  target.dispatchEvent(new Event("change", { bubbles: true }));
+
+  if (typeof FocusEvent === "function") {
+    target.dispatchEvent(
+      new FocusEvent("focusout", { bubbles: true, relatedTarget: null })
+    );
+    target.dispatchEvent(new FocusEvent("blur", { bubbles: true }));
+  } else {
+    target.dispatchEvent(new Event("focusout", { bubbles: true }));
+    target.dispatchEvent(new Event("blur", { bubbles: true }));
+  }
+
+  if (typeof target.blur === "function") {
+    target.blur();
+  }
+
+  return true;
+}
+
+function hasCommittedEditableValue(editableDiv, value) {
+  const target = getLiveEditableTarget(editableDiv);
+  const displayText = getEditableDisplayText(target || editableDiv);
+  const expectedText = normalizeText(value);
+
+  if (displayText === expectedText) {
+    return true;
+  }
+
+  return !!getHourCellContainer(target || editableDiv) &&
+    areEquivalentHourValues(displayText, expectedText);
+}
+
+function selectEditableTargetContents(target) {
+  if (!target) return;
+
+  if (isTextInputElement(target) && typeof target.select === "function") {
+    target.select();
+    return;
+  }
+
+  document.execCommand("selectAll", false, null);
+}
+
+async function waitForLiveEditableTarget(editableDiv, activationTarget, timeoutMs = 180) {
+  const startedAt = performance.now();
+  let target = getLiveEditableTarget(editableDiv) || getLiveEditableTarget(activationTarget);
+
+  while (!target && performance.now() - startedAt < timeoutMs) {
+    await wait(20);
+    target = getLiveEditableTarget(editableDiv) || getLiveEditableTarget(activationTarget);
+  }
+
+  return target;
+}
+
+async function waitForCommittedEditableValue(editableDiv, value, timeoutMs = 180) {
+  const startedAt = performance.now();
+
+  while (performance.now() - startedAt < timeoutMs) {
+    if (hasCommittedEditableValue(editableDiv, value)) {
+      return true;
+    }
+
+    await wait(20);
+  }
+
+  return hasCommittedEditableValue(editableDiv, value);
+}
+
+async function fillEditableDivWithResult(editableDiv, text) {
+  requireExecCommand();
+
+  const value = String(text);
+  const maxAttempts = 2;
+
+  for (let attemptIndex = 0; attemptIndex < maxAttempts; attemptIndex += 1) {
+    const activationTarget = getHourCellContainer(editableDiv) || editableDiv;
+    if (!activationTarget) {
+      return { filled: false, attemptCount: attemptIndex };
+    }
+
+    activationTarget.click();
+    const target = await waitForLiveEditableTarget(editableDiv, activationTarget);
+    if (target) {
+      target.focus();
+      selectEditableTargetContents(target);
+      document.execCommand("delete", false, null);
+      document.execCommand("insertText", false, value);
+      await nextFrame();
+
+      pressTab(target);
+      forceCommitCell(target);
+    }
+
+    if (await waitForCommittedEditableValue(editableDiv, value)) {
+      return { filled: true, attemptCount: attemptIndex + 1 };
+    }
+  }
+
+  return {
+    filled: hasCommittedEditableValue(editableDiv, value),
+    attemptCount: maxAttempts
+  };
 }
 
 async function fillEditableDiv(editableDiv, text) {
-  editableDiv.click();
-  await wait(8);
+  const result = await fillEditableDivWithResult(editableDiv, text);
+  return result.filled;
+}
 
-  editableDiv.focus();
-  document.execCommand("selectAll", false, null);
-  document.execCommand("delete", false, null);
-  document.execCommand("insertText", false, String(text));
-
-  await wait(8);
-  pressTab(editableDiv);
+function blurActiveElement() {
+  const activeElement = document.activeElement;
+  if (activeElement && typeof activeElement.blur === "function") {
+    activeElement.blur();
+  }
 }
 
 /* Toast */
@@ -249,18 +571,56 @@ function extractWbsRow(row) {
   };
 }
 
+function getAssignedCodeFromContainer(container) {
+  const hiddenInput = container?.querySelector(
+    'input[hidden], input[readonly][hidden], input[readonly]'
+  );
+  return (hiddenInput?.id || hiddenInput?.value || "").trim();
+}
+
+function getAssignedCodeForRow(row) {
+  return getAssignedCodeFromContainer(row?.querySelector('[col-id="Assignment"]'));
+}
+
+function getAssignedCodeForRowNumber(rowNumber) {
+  return getAssignedCodeFromContainer(
+    document.getElementById(`entryGridChargeCodeCell-${rowNumber}`)
+  );
+}
+
+function getAssignmentText(row) {
+  const assignmentContainer = row.querySelector(
+    '[col-id="Assignment"] .assignment-container, [col-id="Assignment"] .WorkLocationRow'
+  );
+
+  return normalizeText(
+    assignmentContainer?.getAttribute("aria-label") ||
+      assignmentContainer?.innerText ||
+      assignmentContainer?.textContent ||
+      row.querySelector('[col-id="Assignment"]')?.innerText ||
+      row.querySelector('[col-id="Assignment"]')?.textContent
+  );
+}
+
+function shouldSkipRow(row, options) {
+  const assignmentText = getAssignmentText(row);
+
+  if (!assignmentText) {
+    return true;
+  }
+
+  return options.excludedRowKeywords.some((keyword) =>
+    assignmentText.includes(keyword)
+  );
+}
+
 async function ensureWbsPopupOpenForButton(button) {
   if (!button) return null;
 
   button.click();
-  await wait(300);
+  await wait(500);
 
-  const popup = document.getElementById("My_TE_Time_MenuChargeCodes");
-  if (!popup) {
-    console.warn("WBS popup did not appear.");
-    return null;
-  }
-  return popup;
+  return document.getElementById("My_TE_Time_MenuChargeCodes");
 }
 
 async function scrollWbsPopupToLoadAll(popup) {
@@ -355,71 +715,289 @@ async function extractAllActiveWbsFromPage() {
  * MAIN GRID / ROWS
  ***********************/
 function findGridRowIndexByCode(code) {
-  const gridCells = document.querySelectorAll(
-    '[id^="entryGridChargeCodeCell-"]'
-  );
-  for (let i = 0; i < gridCells.length; i++) {
-    if (gridCells[i].textContent.includes(code)) {
-      const m = gridCells[i].id.match(/entryGridChargeCodeCell-(\d+)/);
-      if (m) return parseInt(m[1], 10);
-    }
-  }
-  return null;
-}
+  const normalizedCode = String(code || "").trim();
 
-async function ensureWbsInRowByCode(code, rowNumber) {
-  const button = document.getElementById(`charge-code-${rowNumber}`);
-  if (!button) {
-    console.warn(`Button charge-code-${rowNumber} not found for WBS ${code}`);
+  if (!normalizedCode) {
     return null;
   }
 
-  const popup = await ensureWbsPopupOpenForButton(button);
-  if (!popup) return null;
+  const gridCells = document.querySelectorAll('[id^="entryGridChargeCodeCell-"]');
+  for (const gridCell of gridCells) {
+    if (!gridCell.textContent.includes(normalizedCode)) {
+      continue;
+    }
 
-  await scrollWbsPopupToLoadAll(popup);
-
-  const rows = Array.from(popup.querySelectorAll('[role="row"][row-id]'));
-  let targetRow = null;
-  for (const r of rows) {
-    const codeCell = r.querySelector('[col-id="code"] span[aria-hidden="true"]');
-    if (codeCell && codeCell.textContent.trim() === code) {
-      targetRow = r;
-      break;
+    const match = gridCell.id.match(/entryGridChargeCodeCell-(\d+)/);
+    if (match) {
+      return Number(match[1]);
     }
   }
 
+  return null;
+}
+
+function findWbsRowInPopup(popup, selection) {
+  const normalizedCode = String(selection?.code || "").trim();
+  const normalizedLabel = normalizeText(selection?.label || "");
+  const rows = Array.from(popup.querySelectorAll('[role="row"][row-id]'));
+
+  return (
+    rows.find((row) => {
+      const codeText = (
+        row.querySelector('[col-id="code"] span[aria-hidden="true"]')
+          ?.textContent || ""
+      ).trim();
+
+      if (normalizedCode && codeText === normalizedCode) {
+        return true;
+      }
+
+      if (normalizedLabel && normalizeText(row.textContent).includes(normalizedLabel)) {
+        return true;
+      }
+
+      return false;
+    }) || null
+  );
+}
+
+async function ensureWbsInRow(selection) {
+  const rowNumber = Number(selection?.rowNumber);
+
+  if (!rowNumber) {
+    return null;
+  }
+
+  const expectedCode = String(selection?.code || "").trim();
+  const existingRowIndex = findGridRowIndexByCode(expectedCode);
+  const existingCode = getAssignedCodeForRowNumber(rowNumber);
+
+  if (expectedCode && existingCode === expectedCode) {
+    return findGridRowIndexByCode(expectedCode) ?? rowNumber;
+  }
+
+  const button = document.getElementById(`charge-code-${rowNumber}`);
+
+  if (!button) {
+    return existingRowIndex;
+  }
+
+  const popup = await ensureWbsPopupOpenForButton(button);
+
+  if (!popup) {
+    console.warn("WBS popup did not appear for row", rowNumber);
+    return null;
+  }
+
+  await scrollWbsPopupToLoadAll(popup);
+
+  const targetRow = findWbsRowInPopup(popup, selection);
   if (!targetRow) {
-    console.warn("WBS code not found in popup:", code);
-    await closeWbsPopup();
+    console.warn("WBS not found in popup for selection", selection);
     return null;
   }
 
   targetRow.click();
-  await wait(250);
-  await closeWbsPopup();
+  await wait(400);
 
-  const rowIndex = findGridRowIndexByCode(code);
-  if (rowIndex === null) {
-    console.warn("Could not find grid row index for code:", code);
+  const resolvedCode =
+    expectedCode ||
+    (
+      targetRow.querySelector('[col-id="code"] span[aria-hidden="true"]')
+        ?.textContent || ""
+    ).trim();
+
+  return findGridRowIndexByCode(resolvedCode) ?? rowNumber;
+}
+
+async function ensureConfiguredWbsSelections(options) {
+  const selections = Array.isArray(options.wbsSelections)
+    ? options.wbsSelections.filter((selection) => selection?.rowNumber)
+    : [];
+  const resolvedSelections = [];
+
+  for (const selection of selections) {
+    const rowIndex = await ensureWbsInRow(selection);
+
+    if (rowIndex !== null) {
+      resolvedSelections.push({ ...selection, rowIndex });
+    }
   }
-  return rowIndex;
+
+  return resolvedSelections;
+}
+
+async function ensureWbsInRowByCode(code, rowNumber, fallbackRowIndex = null) {
+  const rowIndex = await ensureWbsInRow({ rowNumber, code });
+  return rowIndex ?? fallbackRowIndex;
 }
 
 /***********************
  * HOURS FILLING LOGIC
  ***********************/
-function getWorkingDayIndices(exampleRowIndex) {
+const MYTE_GPT_FILL_DEFAULTS = {
+  hours: "7.7",
+  delayMs: 12,
+  skipFilledCells: true,
+  excludedRowKeywords: ["empty", "jour ferie", "holiday"],
+  wbsSelections: [],
+  restrictToSelectedWbs: true
+};
+
+function getNonWorkingColumns(gridRoot) {
+  const nonWorkingColumns = new Set();
+  const headers = gridRoot.querySelectorAll(
+    '.ag-header [role="columnheader"][col-id^="Date"]'
+  );
+
+  headers.forEach((header) => {
+    const columnId = header.getAttribute("col-id");
+
+    if (!columnId) {
+      return;
+    }
+
+    if (isNonWorkingDateElement(header)) {
+      nonWorkingColumns.add(columnId);
+    }
+  });
+
+  markHolidayRowColumns(gridRoot, nonWorkingColumns);
+
+  return nonWorkingColumns;
+}
+
+function hasNonWorkingDateText(value) {
+  const normalized = normalizeText(value);
+  if (!normalized) return false;
+
+  const compact = normalized.replace(/[^a-z]/g, "");
+  if (
+    compact.includes("weekend") ||
+    compact.includes("holiday") ||
+    compact.includes("jourferie") ||
+    compact.includes("ferie")
+  ) {
+    return true;
+  }
+
+  const tokens = normalized.split(/[^a-z]+/).filter(Boolean);
+  return tokens.some((token) =>
+    ["sat", "saturday", "sam", "samedi", "sun", "sunday", "dim", "dimanche"].includes(token)
+  );
+}
+
+function getElementSearchText(element) {
+  return [
+    element?.getAttribute?.("class"),
+    element?.getAttribute?.("aria-label"),
+    element?.textContent
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function isNonWorkingDateElement(element) {
+  return !!element && (
+    element.classList?.contains("isWeekend") ||
+    element.classList?.contains("isHoliday") ||
+    hasNonWorkingDateText(getElementSearchText(element))
+  );
+}
+
+function getColumnIdFromCellId(cell) {
+  const id = getHourCellContainer(cell)?.id || cell?.id || "";
+  const match = id.match(/^entryGridHoursCell-(\d+)-/);
+  return match ? `Date${match[1]}` : "";
+}
+
+function getCellColumnId(cell) {
+  return (
+    cell.closest('[role="gridcell"][col-id]')?.getAttribute("col-id") ||
+    getHourCellContainer(cell)?.getAttribute("col-id") ||
+    getColumnIdFromCellId(cell) ||
+    ""
+  );
+}
+
+function isHolidayAssignmentText(value) {
+  const normalized = normalizeText(value);
+  return normalized.includes("jour ferie") || normalized.includes("holiday");
+}
+
+function hasVisibleCellValue(cell) {
+  return getEditableDisplayText(cell).length > 0 || normalizeText(cell?.textContent).length > 0;
+}
+
+function markHolidayRowColumns(gridRoot, nonWorkingColumns) {
+  const rows = Array.from(
+    gridRoot.querySelectorAll('.ag-center-cols-container [role="row"][row-id]')
+  );
+
+  rows.forEach((row) => {
+    if (!isHolidayAssignmentText(getAssignmentText(row))) {
+      return;
+    }
+
+    row.querySelectorAll('[col-id^="Date"], [id^="entryGridHoursCell-"]').forEach((cell) => {
+      const columnId = getCellColumnId(cell);
+      if (!columnId) {
+        return;
+      }
+
+      if (hasVisibleCellValue(cell) || isNonWorkingDateElement(cell)) {
+        nonWorkingColumns.add(columnId);
+      }
+    });
+  });
+}
+
+function isFallbackWorkingDayCell(cell, nonWorkingColumns) {
+  const columnId = getCellColumnId(cell);
+
+  if (columnId && nonWorkingColumns?.has(columnId)) {
+    return false;
+  }
+
+  return !hasNonWorkingDateText(getElementSearchText(cell));
+}
+
+function isCellFilled(cell) {
+  return getEditableDisplayText(cell).length > 0;
+}
+
+function isEditableHoursCell(cell) {
+  return (
+    cell.matches('[id^="hours-cell-"]') &&
+    cell.getAttribute("contenteditable") === "true" &&
+    cell.getAttribute("aria-disabled") !== "true"
+  );
+}
+
+function isWorkingDayCell(cell, nonWorkingColumns) {
+  const columnId = getCellColumnId(cell);
+
+  if (!columnId || nonWorkingColumns.has(columnId)) {
+    return false;
+  }
+
+  return !hasNonWorkingDateText(getElementSearchText(cell));
+}
+
+function getWorkingDayIndices(exampleRowIndex, nonWorkingColumns = new Set()) {
   const cells = Array.from(
     document.querySelectorAll(`[id^="entryGridHoursCell-"]`)
   ).filter((c) => c.id.endsWith(`-${exampleRowIndex}`));
 
   const indices = [];
   for (const cell of cells) {
-    if (!cell.classList.contains("special-cell")) {
-      const m = cell.id.match(/entryGridHoursCell-(\d+)-/);
-      if (m) indices.push(parseInt(m[1], 10));
+    if (cell.classList.contains("special-cell") ||
+      !isFallbackWorkingDayCell(cell, nonWorkingColumns)) {
+      continue;
     }
+
+    const m = cell.id.match(/entryGridHoursCell-(\d+)-/);
+    if (m) indices.push(parseInt(m[1], 10));
   }
 
   indices.sort((a, b) => a - b);
@@ -459,6 +1037,166 @@ function computeDailyHoursPerWbs(config) {
   return result;
 }
 
+function collectFallbackTargetCells(rowIndex, options, nonWorkingColumns = new Set()) {
+  const targetCells = [];
+  const workingDayIndices = getWorkingDayIndices(Number(rowIndex), nonWorkingColumns);
+
+  for (const dayIndex of workingDayIndices) {
+    const cell = document.getElementById(`entryGridHoursCell-${dayIndex}-${rowIndex}`);
+    if (!cell) continue;
+
+    if (options.skipFilledCells && isCellFilled(cell)) continue;
+
+    targetCells.push(cell);
+  }
+
+  return targetCells;
+}
+
+function mergeTargetCells(primaryCells, fallbackCells) {
+  const mergedCells = [];
+  const seen = new Set();
+
+  const appendCell = (cell) => {
+    if (!cell) return;
+
+    const key = getTargetCellKey(cell) || cell;
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    mergedCells.push(cell);
+  };
+
+  primaryCells.forEach(appendCell);
+  fallbackCells.forEach(appendCell);
+
+  return mergedCells;
+}
+
+function collectTargetCellsForSelections(gridRoot, resolvedSelections, options) {
+  const selectedRowIds = new Set(
+    resolvedSelections.map((selection) => String(selection.rowIndex)).filter(Boolean)
+  );
+  const nonWorkingColumns = getNonWorkingColumns(gridRoot);
+  const rows = Array.from(
+    gridRoot.querySelectorAll('.ag-center-cols-container [role="row"][row-id]')
+  );
+  const targetCells = [];
+
+  rows.forEach((row) => {
+    if (!row.querySelector('[col-id="Assignment"] .assignment-container')) {
+      return;
+    }
+
+    if (options.restrictToSelectedWbs && selectedRowIds.size) {
+      const rowId = String(row.getAttribute("row-id") || "");
+      const assignedCode = getAssignedCodeForRow(row);
+
+      if (
+        !selectedRowIds.has(rowId) &&
+        !resolvedSelections.some((selection) => selection.code === assignedCode)
+      ) {
+        return;
+      }
+    }
+
+    if (shouldSkipRow(row, options)) {
+      return;
+    }
+
+    const rowCells = Array.from(row.querySelectorAll('.cellTooltip')).filter((cell) => {
+      if (!isEditableHoursCell(cell)) {
+        return false;
+      }
+
+      if (!isWorkingDayCell(cell, nonWorkingColumns)) {
+        return false;
+      }
+
+      if (options.skipFilledCells && isCellFilled(cell)) {
+        return false;
+      }
+
+      return true;
+    });
+
+    targetCells.push(
+      ...rowCells.map((cell) => getHourCellContainer(cell) || cell)
+    );
+  });
+
+  const fallbackCells = [];
+  selectedRowIds.forEach((rowId) => {
+    fallbackCells.push(...collectFallbackTargetCells(rowId, options, nonWorkingColumns));
+  });
+
+  return selectedRowIds.size
+    ? mergeTargetCells(fallbackCells, targetCells)
+    : mergeTargetCells(targetCells, fallbackCells);
+}
+
+async function fillTimesheetCellsWithGptLogic(overrides = {}) {
+  const options = { ...MYTE_GPT_FILL_DEFAULTS, ...overrides };
+  options.hours = formatHoursForInput(options.hours);
+  const gridRoot = getGridRoot();
+
+  if (!gridRoot) {
+    throw new Error("Time Entry Grid not found on the current page.");
+  }
+
+  const resolvedSelections = Array.isArray(options.resolvedSelections)
+    ? options.resolvedSelections
+    : await ensureConfiguredWbsSelections(options);
+
+  await advanceFrames(2);
+
+  const nonWorkingColumns = getNonWorkingColumns(gridRoot);
+  const targetCells = collectTargetCellsForSelections(
+    gridRoot,
+    resolvedSelections,
+    options
+  );
+
+  let retriedCellCount = 0;
+
+  for (const cell of targetCells) {
+    const fillResult = await fillEditableDivWithResult(cell, options.hours);
+    if (fillResult.attemptCount > 1) {
+      retriedCellCount += 1;
+    }
+    if (options.delayMs > 0) {
+      await wait(options.delayMs);
+    }
+  }
+
+  blurActiveElement();
+  await advanceFrames(2);
+
+  const failedCellCount = targetCells.filter(
+    (cell) => !hasCommittedEditableValue(cell, options.hours)
+  ).length;
+  const filledRows = new Set(
+    targetCells
+      .map((cell) => cell.closest('[role="row"][row-id]')?.getAttribute("row-id"))
+      .filter(Boolean)
+  );
+
+  const result = {
+    filledCellCount: targetCells.length,
+    filledRowCount: filledRows.size,
+    retriedCellCount,
+    failedCellCount,
+    hours: options.hours,
+    nonWorkingColumns: Array.from(nonWorkingColumns).sort(),
+    resolvedSelections
+  };
+
+  console.log("[MyTE] Shared fill complete.", result);
+  return result;
+}
+
 async function fillTimesheetWithConfig(config) {
   const allocations = (config.wbsAllocations || []).filter(
     (w) => w.code && Number(w.weight) > 0
@@ -469,31 +1207,10 @@ async function fillTimesheetWithConfig(config) {
     return false;
   }
 
-  const codeToRowIndex = {};
+  const codeToPreferredRowNumber = {};
   for (let i = 0; i < allocations.length; i++) {
     const { code } = allocations[i];
-
-    let rowIndex = findGridRowIndexByCode(code);
-    if (rowIndex === null) {
-      rowIndex = await ensureWbsInRowByCode(code, i + 1);
-    }
-    if (rowIndex === null) {
-      alert(
-        `MyTE Autofill: Row not found for WBS ${code}. ` +
-        `Check that this WBS is authorized for the period.`
-      );
-      showToast(`Row not found for WBS ${code}.`, "error");
-      return false;
-    }
-    codeToRowIndex[code] = rowIndex;
-  }
-
-  const anyRowIndex = codeToRowIndex[allocations[0].code];
-  const workingDayIndices = getWorkingDayIndices(anyRowIndex);
-  if (!workingDayIndices.length) {
-    alert("MyTE Autofill: No working days detected in the grid.");
-    showToast("No working days detected in the grid.", "error");
-    return false;
+    codeToPreferredRowNumber[code] = i + 1;
   }
 
   const perWbs = computeDailyHoursPerWbs(config);
@@ -504,21 +1221,56 @@ async function fillTimesheetWithConfig(config) {
   }
 
   console.log("[MyTE] Per-WBS daily hours distribution:", perWbs);
-  console.log("[MyTE] Working day indices:", workingDayIndices);
+  for (const { code, hours } of perWbs) {
+    const wbsSelection = {
+      rowNumber: codeToPreferredRowNumber[code],
+      code,
+      label:
+        (config.availableWbs || state.config.availableWbs || []).find(
+          (wbs) => wbs.code === code
+        )?.description || ""
+    };
+    const resolvedSelections = await ensureConfiguredWbsSelections({
+      wbsSelections: [wbsSelection]
+    });
 
-  for (const dayIndex of workingDayIndices) {
-    for (const { code, hours } of perWbs) {
-      const rowIndex = codeToRowIndex[code];
-      const cell = document.getElementById(
-        `entryGridHoursCell-${dayIndex}-${rowIndex}`
+    if (!resolvedSelections.length) {
+      alert(
+        `MyTE Autofill: Row not found for WBS ${code}. ` +
+        `Check that this WBS is authorized for the period.`
       );
-      if (!cell) continue;
+      showToast(`Row not found for WBS ${code}.`, "error");
+      return false;
+    }
 
-      const editableDiv = cell.querySelector('[contenteditable="true"]');
-      if (!editableDiv) continue;
+    let fillResult;
+    try {
+      fillResult = await fillTimesheetCellsWithGptLogic({
+        hours: formatHoursForInput(hours),
+        wbsSelections: [wbsSelection],
+        resolvedSelections,
+        skipFilledCells: false
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === "Time Entry Grid not found on the current page.") {
+        alert("MyTE Autofill: Time Entry Grid not found on the current page.");
+        showToast("Time Entry Grid not found on the current page.", "error");
+        return false;
+      }
 
-      await fillEditableDiv(editableDiv, hours.toFixed(1));
-      await wait(10);
+      throw error;
+    }
+
+    if (!fillResult.filledCellCount) {
+      alert(`MyTE Autofill: No working day cells found for WBS ${code}.`);
+      showToast(`No working day cells found for WBS ${code}.`, "error");
+      return false;
+    }
+
+    if (fillResult.failedCellCount > 0) {
+      alert(`MyTE Autofill: Some cells for WBS ${code} did not keep their value.`);
+      showToast(`Some cells for WBS ${code} did not keep their value.`, "error");
+      return false;
     }
   }
 
@@ -530,64 +1282,220 @@ async function fillTimesheetWithConfig(config) {
 /***********************
  * TIME CATEGORY LOGIC
  ***********************/
-function applyWeeklyPatternAndRest(config) {
-  const weeklyPattern = config.weeklyPattern || {};
-  const autoCheckRest = !!config.autoCheckRest;
+const WORK_LOCATION_CHECKBOX_PREFIXES = [
+  "homeworking-full-day-",
+  "homeworking-half-day-",
+  "office-client-"
+];
 
-  const whiteIndices = [];
+const DAILY_REST_CHECKBOX_PREFIX = "jai-respect-mon-repos-quotidien-";
+const WEEKLY_REST_CHECKBOX_PREFIX = "jai-respect-mon-repos-hebdomadaire-";
+const REST_CHECKBOX_PREFIXES = [
+  DAILY_REST_CHECKBOX_PREFIX,
+  WEEKLY_REST_CHECKBOX_PREFIX
+];
+const REST_SIDE_HEADER_IDS = [
+  "jai-respect-mon-repos-quotidien-side-header",
+  "jai-respect-mon-repos-hebdomadaire-side-header"
+];
+
+const WEEKEND_TIME_CATEGORY_INDEX = -1;
+
+const WEEKDAY_TEXT_MATCHES = [
+  { index: 0, names: ["monday", "mon", "lundi", "lun"] },
+  { index: 1, names: ["tuesday", "tues", "tue", "mardi", "mar"] },
+  { index: 2, names: ["wednesday", "wed", "mercredi", "mer"] },
+  { index: 3, names: ["thursday", "thurs", "thu", "jeudi", "jeu"] },
+  { index: 4, names: ["friday", "fri", "vendredi", "ven"] },
+  { index: WEEKEND_TIME_CATEGORY_INDEX, names: ["saturday", "sat", "samedi", "sam"] },
+  { index: WEEKEND_TIME_CATEGORY_INDEX, names: ["sunday", "sun", "dimanche", "dim"] }
+];
+
+function getTimeCategoryCell(index) {
+  return (
+    document.getElementById(`timeCategoryCell-2-${index}`) ||
+    document.getElementById(`timeCategoryCell-4-${index}`)
+  );
+}
+
+function isFillableTimeCategoryCell(cell) {
+  return !!cell && !cell.classList.contains("special-cell");
+}
+
+function getCheckboxIndexFromId(id, prefix) {
+  const suffix = String(id || "").slice(prefix.length);
+  return /^\d+$/.test(suffix) ? Number(suffix) : null;
+}
+
+function getTimeCategoryCheckboxes(prefix) {
+  return Array.from(document.querySelectorAll(`input[id^="${prefix}"]`)).filter(
+    (checkbox) => getCheckboxIndexFromId(checkbox.id, prefix) !== null
+  );
+}
+
+function hasRestRows() {
+  return REST_CHECKBOX_PREFIXES.some((prefix) =>
+    document.querySelector(`[id^="${prefix}"]`)
+  ) || REST_SIDE_HEADER_IDS.some((id) => document.getElementById(id));
+}
+
+function getFillableTimeCategoryIndices() {
+  const indices = [];
 
   for (let i = 0; i <= 50; i++) {
-    const cell =
-      document.getElementById(`timeCategoryCell-2-${i}`) ||
-      document.getElementById(`timeCategoryCell-4-${i}`);
-    if (cell && !cell.classList.contains("special-cell")) {
-      whiteIndices.push(i);
+    if (isFillableTimeCategoryCell(getTimeCategoryCell(i))) {
+      indices.push(i);
     }
   }
+
+  return indices;
+}
+
+function setTimeCategoryCheckboxElement(cb, desired, options = {}) {
+  if (!cb) return;
+
+  const { skipSpecial = true } = options;
+  if (skipSpecial) {
+    const cell = cb.closest('[id^="timeCategoryCell-"]');
+    if (!isFillableTimeCategoryCell(cell)) return;
+  }
+
+  userSetCheckbox(cb, desired);
+}
+
+function setTimeCategoryCheckbox(prefix, index, desired, options = {}) {
+  const cb = document.getElementById(prefix + index);
+  setTimeCategoryCheckboxElement(cb, desired, options);
+}
+
+function setTimeCategoryCheckboxes(prefixes, index, desired) {
+  prefixes.forEach((prefix) => setTimeCategoryCheckbox(prefix, index, desired));
+}
+
+function setTimeCategoryCheckboxesByPrefix(prefix, desired, options = {}) {
+  getTimeCategoryCheckboxes(prefix).forEach((checkbox) => {
+    setTimeCategoryCheckboxElement(checkbox, desired, options);
+  });
+}
+
+function getWeekdayIndexFromText(value) {
+  const normalized = normalizeText(value);
+  if (!normalized) return null;
+
+  const tokens = normalized.split(/[^a-z]+/).filter(Boolean);
+  for (const token of tokens) {
+    for (const { index, names } of WEEKDAY_TEXT_MATCHES) {
+      if (names.includes(token)) {
+        return index;
+      }
+    }
+  }
+
+  const compact = normalized.replace(/[^a-z]/g, "");
+  for (const { index, names } of WEEKDAY_TEXT_MATCHES) {
+    if (names.some((name) => compact.startsWith(name))) {
+      return index;
+    }
+  }
+
+  return null;
+}
+
+function getDateColumnHeader(index) {
+  return (
+    document.querySelector(`.ag-header [role="columnheader"][col-id="Date${index}"]`) ||
+    document.querySelector(`[role="columnheader"][col-id="Date${index}"]`)
+  );
+}
+
+function getDateColumnWeekdayIndex(index) {
+  const header = getDateColumnHeader(index);
+  if (!header) return null;
+
+  const dateCell = header.querySelector(".header-date-cell");
+  const weekdayNode =
+    dateCell?.querySelector("span[lang]") ||
+    dateCell?.querySelector("span");
+  const headerText = [
+    weekdayNode?.textContent,
+    header.getAttribute("aria-label"),
+    header.textContent
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return getWeekdayIndexFromText(headerText);
+}
+
+function getTimeCategoryWeekdayIndex(index, position) {
+  const headerWeekdayIndex = getDateColumnWeekdayIndex(index);
+
+  if (headerWeekdayIndex === WEEKEND_TIME_CATEGORY_INDEX) {
+    return null;
+  }
+
+  if (headerWeekdayIndex !== null) {
+    return headerWeekdayIndex;
+  }
+
+  return position % 5;
+}
+
+function applyWeeklyPatternAndRest(config) {
+  const cfg = config || {};
+  const weeklyPattern = cfg.weeklyPattern || {};
+  const weeklyPatternEnabled = cfg.weeklyPatternEnabled !== false;
+  const autoCheckRest = !!cfg.autoCheckRest;
+  const fillableIndices = getFillableTimeCategoryIndices();
 
   // Weekly HW/Office pattern
-  whiteIndices.forEach((index, position) => {
-    const homeworkingCheckbox = document.getElementById(
-      "homeworking-full-day-" + index
-    );
-    const officeCheckbox = document.getElementById("office-client-" + index);
-    const dayInWeek = position % 5;
-    const mode = weeklyPattern[dayInWeek] || "HW";
+  if (weeklyPatternEnabled) {
+    fillableIndices.forEach((index, position) => {
+      const dayInWeek = getTimeCategoryWeekdayIndex(index, position);
+      if (dayInWeek === null) return;
 
-    if (mode === "Office") {
-      userSetCheckbox(officeCheckbox, true);
-      userSetCheckbox(homeworkingCheckbox, false);
-    } else if (mode === "None") {
-      userSetCheckbox(officeCheckbox, false);
-      userSetCheckbox(homeworkingCheckbox, false);
-    } else {
-      userSetCheckbox(homeworkingCheckbox, true);
-      userSetCheckbox(officeCheckbox, false);
-    }
-  });
+      const mode = weeklyPattern[dayInWeek] || "HW";
 
-  // Daily / weekly rest
-  if (autoCheckRest) {
-    const checkRow = (prefix) => {
-      for (let i = 0; i <= 50; i++) {
-        const cb = document.getElementById(prefix + i);
-        if (!cb) continue;
-        const cell = cb.closest('[id^="timeCategoryCell-"]');
-        if (cell && !cell.classList.contains("special-cell")) {
-          userSetCheckbox(cb, true);
-        }
+      if (mode === "Office") {
+        setTimeCategoryCheckbox("office-client-", index, true);
+        setTimeCategoryCheckbox("homeworking-full-day-", index, false);
+        setTimeCategoryCheckbox("homeworking-half-day-", index, false);
+      } else if (mode === "HW_HALF") {
+        setTimeCategoryCheckbox("homeworking-full-day-", index, false);
+        setTimeCategoryCheckbox("homeworking-half-day-", index, true);
+        setTimeCategoryCheckbox("office-client-", index, false);
+      } else if (mode === "None") {
+        setTimeCategoryCheckboxes(WORK_LOCATION_CHECKBOX_PREFIXES, index, false);
+      } else {
+        setTimeCategoryCheckbox("homeworking-full-day-", index, true);
+        setTimeCategoryCheckbox("homeworking-half-day-", index, false);
+        setTimeCategoryCheckbox("office-client-", index, false);
       }
-    };
-
-    checkRow("jai-respect-mon-repos-quotidien-");
-    checkRow("jai-respect-mon-repos-hebdomadaire-");
+    });
+  } else {
+    fillableIndices.forEach((index) => {
+      setTimeCategoryCheckboxes(WORK_LOCATION_CHECKBOX_PREFIXES, index, false);
+    });
   }
 
-  console.log("[MyTE] Time categories updated with weekly pattern.", {
+  // Daily / weekly rest
+  setTimeCategoryCheckboxesByPrefix(DAILY_REST_CHECKBOX_PREFIX, autoCheckRest, {
+    skipSpecial: true
+  });
+  setTimeCategoryCheckboxesByPrefix(WEEKLY_REST_CHECKBOX_PREFIX, autoCheckRest, {
+    skipSpecial: !autoCheckRest
+  });
+
+  console.log("[MyTE] Time categories updated.", {
     weeklyPattern,
+    weeklyPatternEnabled,
     autoCheckRest
   });
-  showToast("Time categories updated.", "success");
+  if (weeklyPatternEnabled || autoCheckRest) {
+    showToast("Time categories updated.", "success");
+  } else {
+    showToast("Time categories cleared.", "success");
+  }
 }
 
 /***********************
@@ -606,6 +1514,38 @@ function applyThemeClass() {
 
   const themeSelect = state.panel.querySelector("#myte-theme-select");
   if (themeSelect) themeSelect.value = style;
+}
+
+function isWeeklyPatternEnabled(config = state.config) {
+  return config?.weeklyPatternEnabled !== false;
+}
+
+function updateWeeklyPatternVisibility() {
+  if (!state.panel) return;
+
+  const weekRows = state.panel.querySelector(".myte-week-rows");
+  if (!weekRows) return;
+
+  const enabled = isWeeklyPatternEnabled();
+  weekRows.hidden = !enabled;
+  weekRows.setAttribute("aria-hidden", String(!enabled));
+}
+
+function updateAutoRestVisibility() {
+  if (!state.panel) return;
+
+  const autoRestOption = state.panel.querySelector("#myte-auto-rest-option");
+  const autoRest = state.panel.querySelector("#myte-auto-rest");
+  const visible = hasRestRows();
+
+  if (autoRestOption) {
+    autoRestOption.hidden = !visible;
+    autoRestOption.setAttribute("aria-hidden", String(!visible));
+  }
+
+  if (autoRest) {
+    autoRest.disabled = !visible;
+  }
 }
 
 function updateWbsButtonLabel() {
@@ -687,6 +1627,7 @@ function updateWeekEmoji(dayIndex, mode) {
   if (!span) return;
 
   if (mode === "Office") span.textContent = "🏢";
+  else if (mode === "HW_HALF") span.textContent = "🏠½";
   else if (mode === "None") span.textContent = "⬜";
   else span.textContent = "🏠";
 
@@ -752,6 +1693,20 @@ function getWbsMetaMarkup(wbs) {
   `;
 }
 
+function getWbsOptionTitleMarkup(wbs) {
+  const code = (wbs?.code || "").trim();
+  const client = (wbs?.client || "").trim();
+  const clientMarkup = client
+    ? `<span class="myte-wbs-option-client"> - ${escapeHtml(client)}</span>`
+    : "";
+
+  return `
+    <span class="myte-wbs-option-title">
+      <span class="myte-wbs-option-code">${escapeHtml(code)}</span>${clientMarkup}
+    </span>
+  `;
+}
+
 function getOrderedWbsOptions(availableWbs, favoriteCodes, currentCode) {
   const favorites = [];
   const others = [];
@@ -776,8 +1731,13 @@ function filterWbsOptions(orderedOptions, query) {
 
   return orderedOptions.filter((wbs) => {
     const code = (wbs.code || "").toLowerCase();
+    const client = (wbs.client || "").toLowerCase();
     const description = (wbs.description || "").toLowerCase();
-    return code.includes(normalizedQuery) || description.includes(normalizedQuery);
+    return (
+      code.includes(normalizedQuery) ||
+      client.includes(normalizedQuery) ||
+      description.includes(normalizedQuery)
+    );
   });
 }
 
@@ -829,7 +1789,7 @@ function renderWbsAutocomplete(row, index) {
       return `
         <button type="button" class="myte-wbs-option" data-index="${index}" data-code="${escapeHtml(wbs.code)}">
           <span class="myte-wbs-option-main">
-            <span class="myte-wbs-option-code">${escapeHtml(wbs.code)}</span>
+            ${getWbsOptionTitleMarkup(wbs)}
             <span class="myte-wbs-option-desc">${escapeHtml(wbs.description || "No description")}</span>
           </span>
           ${isFav ? '<span class="myte-wbs-option-fav">★</span>' : ""}
@@ -885,13 +1845,16 @@ function getWeekdayLabel(dayIndex) {
 }
 
 function getWorkLocationLabel(mode) {
+  if (mode === "HW") return "Homeworking - Full Day";
+  if (mode === "HW_HALF") return "Homeworking - Half Day";
   if (mode === "Office") return "Office / Client";
   if (mode === "None") return "None";
-  return "Homeworking";
+  return "Homeworking - Full Day";
 }
 
 function getNextWorkLocationMode(mode) {
-  if (mode === "HW") return "Office";
+  if (mode === "HW") return "HW_HALF";
+  if (mode === "HW_HALF") return "Office";
   if (mode === "Office") return "None";
   return "HW";
 }
@@ -1122,10 +2085,19 @@ function applyConfigToUI() {
   const cfg = state.config;
 
   const dailyHoursInput = state.panel.querySelector("#myte-daily-hours");
-  if (dailyHoursInput) dailyHoursInput.value = cfg.dailyHours;
+  if (dailyHoursInput) dailyHoursInput.value = formatHoursForInput(cfg.dailyHours);
 
   const autoRest = state.panel.querySelector("#myte-auto-rest");
   if (autoRest) autoRest.checked = !!cfg.autoCheckRest;
+  updateAutoRestVisibility();
+
+  const weeklyPatternEnabled = state.panel.querySelector(
+    "#myte-weekly-pattern-enabled"
+  );
+  if (weeklyPatternEnabled) {
+    weeklyPatternEnabled.checked = isWeeklyPatternEnabled(cfg);
+  }
+  updateWeeklyPatternVisibility();
 
   const selects = state.panel.querySelectorAll(".myte-week-select");
   selects.forEach((sel) => {
@@ -1206,9 +2178,17 @@ function wirePanelEvents() {
 
   state.panel
     .querySelector("#myte-daily-hours")
+    ?.addEventListener("input", (e) => {
+      normalizeHoursInputValue(e.target);
+    });
+
+  state.panel
+    .querySelector("#myte-daily-hours")
     ?.addEventListener("change", (e) => {
-      const val = Number(e.target.value) || 7.7;
-      state.config.dailyHours = val;
+      normalizeHoursInputValue(e.target);
+      const value = formatHoursForInput(e.target.value);
+      e.target.value = value;
+      state.config.dailyHours = Number(value);
       saveConfig();
     });
 
@@ -1217,6 +2197,14 @@ function wirePanelEvents() {
     ?.addEventListener("change", (e) => {
       state.config.autoCheckRest = !!e.target.checked;
       saveConfig();
+    });
+
+  state.panel
+    .querySelector("#myte-weekly-pattern-enabled")
+    ?.addEventListener("change", (e) => {
+      state.config.weeklyPatternEnabled = !!e.target.checked;
+      saveConfig();
+      updateWeeklyPatternVisibility();
     });
 
   state.panel
@@ -1583,18 +2571,36 @@ function exposeTestApi() {
     userSetCheckbox,
     isActiveWbsRow,
     extractWbsRow,
+    getAssignedCodeFromContainer,
+    getAssignedCodeForRow,
+    getAssignedCodeForRowNumber,
+    getAssignmentText,
+    shouldSkipRow,
     ensureWbsPopupOpenForButton,
     scrollWbsPopupToLoadAll,
     closeWbsPopup,
     waitForChargeCodeOpener,
     extractAllActiveWbsFromPage,
     findGridRowIndexByCode,
+    findWbsRowInPopup,
+    ensureWbsInRow,
+    ensureConfiguredWbsSelections,
     ensureWbsInRowByCode,
+    getGridRoot,
+    getNonWorkingColumns,
+    getCellColumnId,
+    isCellFilled,
+    isEditableHoursCell,
+    isWorkingDayCell,
     getWorkingDayIndices,
     computeDailyHoursPerWbs,
+    mergeTargetCells,
+    fillTimesheetCellsWithGptLogic,
     fillTimesheetWithConfig,
     applyWeeklyPatternAndRest,
     applyThemeClass,
+    isWeeklyPatternEnabled,
+    updateWeeklyPatternVisibility,
     updateWbsButtonLabel,
     updateWbsCountLabel,
     autoLoadWbsIfNeeded,
@@ -1604,6 +2610,7 @@ function exposeTestApi() {
     escapeHtml,
     findWbsByPickerValue,
     getWbsMetaMarkup,
+    getWbsOptionTitleMarkup,
     getOrderedWbsOptions,
     filterWbsOptions,
     closeWbsAutocomplete,
@@ -1616,6 +2623,8 @@ function exposeTestApi() {
     setWeeklyPatternDay,
     updateWeightSummary,
     validateWbsConfigForFill,
+    hasRestRows,
+    updateAutoRestVisibility,
     createPanel,
     removePanel,
     togglePanel,

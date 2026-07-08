@@ -22,6 +22,7 @@ export async function loadContentScript(options = {}) {
     : { myteAutofillConfig: cloneValue(storageData) };
 
   let lastFocusedElement = null;
+  let activeElement = document.body;
 
   document.body.innerHTML = "";
   delete globalThis.__MYTE_TEST_API__;
@@ -30,11 +31,29 @@ export async function loadContentScript(options = {}) {
   globalThis.requestAnimationFrame = (callback) => callback();
   globalThis.alert = vi.fn();
 
+  Object.defineProperty(document, "activeElement", {
+    configurable: true,
+    get() {
+      return activeElement || document.body;
+    }
+  });
+
   Object.defineProperty(HTMLElement.prototype, "focus", {
     configurable: true,
     writable: true,
     value() {
       lastFocusedElement = this;
+      activeElement = this;
+    }
+  });
+
+  Object.defineProperty(HTMLElement.prototype, "blur", {
+    configurable: true,
+    writable: true,
+    value() {
+      if (activeElement === this) {
+        activeElement = document.body;
+      }
     }
   });
 
@@ -44,10 +63,22 @@ export async function loadContentScript(options = {}) {
     value: vi.fn((command, _showUi, value) => {
       if (!lastFocusedElement) return true;
 
+      const isTextInput =
+        typeof lastFocusedElement.matches === "function" &&
+        lastFocusedElement.matches('input:not([type="hidden"]), textarea');
+
       if (command === "delete") {
-        lastFocusedElement.textContent = "";
+        if (isTextInput) {
+          lastFocusedElement.value = "";
+        } else {
+          lastFocusedElement.textContent = "";
+        }
       } else if (command === "insertText") {
-        lastFocusedElement.textContent = String(value ?? "");
+        if (isTextInput) {
+          lastFocusedElement.value = String(value ?? "");
+        } else {
+          lastFocusedElement.textContent = String(value ?? "");
+        }
       }
 
       return true;

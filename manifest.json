@@ -2,10 +2,10 @@
   "manifest_version": 3,
   "name": "MyTE Autofill Helper",
   "short_name": "MyTE Autofill",
-  "version": "1.3.0",
+  "version": "1.4.1",
   "description": "Autofill Accenture MyTE timesheets with multi-WBS allocations and homeworking/office patterns.",
 
-  "homepage_url": "https://github.com/gla-showcase/myte-autofill",
+  "homepage_url": "https://chromewebstore.google.com/detail/myte-autofill-helper/dfpohbobkklfchohecohngodhagffhib",
   "offline_enabled": false,
   "minimum_chrome_version": "100",
 
@@ -50,6 +50,7 @@
     }
   ]
 }
+
 
 
 

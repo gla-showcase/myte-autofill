@@ -55,17 +55,20 @@ describe("content.js logic helpers", () => {
     const { api } = await loadContentScript();
     const availableWbs = [
       { code: "ABC123", description: "Client Alpha" },
-      { code: "XYZ999", description: "Beta rollout" }
+      { code: "XYZ999", client: "Saft", description: "Beta rollout" }
     ];
 
     expect(api.filterWbsOptions(availableWbs, "beta")).toEqual([
-      { code: "XYZ999", description: "Beta rollout" }
+      { code: "XYZ999", client: "Saft", description: "Beta rollout" }
+    ]);
+    expect(api.filterWbsOptions(availableWbs, "saft")).toEqual([
+      { code: "XYZ999", client: "Saft", description: "Beta rollout" }
     ]);
     expect(api.findWbsByPickerValue(availableWbs, "ABC123 - Client Alpha")).toEqual(
       { code: "ABC123", description: "Client Alpha" }
     );
     expect(api.findWbsByPickerValue(availableWbs, "XYZ999")).toEqual(
-      { code: "XYZ999", description: "Beta rollout" }
+      { code: "XYZ999", client: "Saft", description: "Beta rollout" }
     );
   });
 

@@ -627,15 +627,27 @@
 
 .myte-wbs-option-main {
   min-width: 0;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.myte-wbs-option-code {
+.myte-wbs-option-title {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 12px;
   font-weight: 700;
   color: var(--myte-text);
+}
+
+.myte-wbs-option-code,
+.myte-wbs-option-client {
+  font: inherit;
+  color: inherit;
 }
 
 .myte-wbs-option-desc {
@@ -757,6 +769,10 @@
   flex-direction: column;
   gap: 8px;
   margin-top: 6px;
+}
+
+.myte-week-rows[hidden] {
+  display: none;
 }
 
 .myte-week-row {
