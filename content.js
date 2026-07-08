@@ -1501,7 +1501,7 @@ function wireFeedbackMenuEvents() {
   });
 
   feedbackMenu.addEventListener("click", (event) => {
-    const feedbackItem = event.target.closest?.(".myte-feedback-item");
+    const feedbackItem = event.target.closest(".myte-feedback-item");
     if (!feedbackItem) return;
 
     const feedbackUrl = feedbackUrls[feedbackItem.dataset.feedbackType];

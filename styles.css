@@ -150,11 +150,6 @@
   border-radius: 999px;
 }
 
-#myte-close-btn:hover {
-  background-color: var(--myte-primary-soft);
-  color: var(--myte-primary);
-}
-
 #myte-feedback-btn {
   border: none;
   background: transparent;
@@ -167,7 +162,9 @@
   align-items: center;
 }
 
-#myte-feedback-btn:hover {
+#myte-close-btn:hover,
+#myte-feedback-btn:hover,
+.myte-feedback-item:hover {
   background-color: var(--myte-primary-soft);
   color: var(--myte-primary);
 }
@@ -206,11 +203,6 @@
   font-size: 13px;
   text-align: left;
   transition: background-color 0.12s, color 0.12s;
-}
-
-.myte-feedback-item:hover {
-  background: var(--myte-primary-soft);
-  color: var(--myte-primary);
 }
 
 /* Style dropdown in header (no label) */
