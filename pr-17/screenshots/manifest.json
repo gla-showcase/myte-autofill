@@ -4,6 +4,10 @@
     "name": "fill-timesheet-screenshot.png"
   },
   {
+    "title": "clears work location and rest rows when panel toggles are disabled",
+    "name": "disabled-category-toggles-screenshot.png"
+  },
+  {
     "title": "loads active WBS entries from the popup and seeds the first allocation",
     "name": "load-wbs-screenshot.png"
   },
