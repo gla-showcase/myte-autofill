@@ -28,3 +28,96 @@ jobs:
 
       - name: Run automated tests
         run: npm test
+
+  playwright:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install test dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright smoke tests
+        run: npm run test:smoke
+
+      - name: Publish summary
+        if: always()
+        run: |
+          node -e '
+            const fs = require("fs");
+            const resultsPath = "test-results/playwright/results.json";
+            const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+            if (!fs.existsSync(resultsPath)) {
+              fs.appendFileSync(summaryPath, "## Playwright smoke tests\n\nNo results file was produced.\n");
+              process.exit(0);
+            }
+            const { stats } = JSON.parse(fs.readFileSync(resultsPath, "utf8"));
+            const lines = [
+              "## Playwright smoke tests",
+              "",
+              "| Passed | Failed | Flaky | Skipped | Duration |",
+              "|---|---|---|---|---|",
+              "| " + stats.expected + " | " + stats.unexpected + " | " + stats.flaky + " | " + stats.skipped + " | " + (stats.duration / 1000).toFixed(1) + "s |",
+              "",
+              "Full HTML report with traces, videos, and screenshots is attached below as the `playwright-report` artifact."
+            ];
+            fs.appendFileSync(summaryPath, lines.join("\n") + "\n");
+          '
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          if-no-files-found: error
+
+  pages:
+    needs: playwright
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Playwright report
+        uses: actions/download-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+
+      - name: Determine deployment path
+        id: target
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "dir=pr-${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "dir=main" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish report to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: playwright-report
+          destination_dir: ${{ steps.target.outputs.dir }}
+          keep_files: true
+
+      - name: Publish preview link
+        run: |
+          {
+            echo "## Playwright report (GitHub Pages)"
+            echo ""
+            echo "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ steps.target.outputs.dir }}/"
+          } >> "$GITHUB_STEP_SUMMARY"

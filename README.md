@@ -225,7 +225,7 @@ Generate a local coverage report with:
 npm run test:coverage
 ```
 
-The current automated suite covers pure allocation logic, panel lifecycle behavior, MyTE-like DOM scenarios for hour filling, weekly pattern application, WBS autocomplete and favorites, popup-based WBS extraction, and the background action routing logic. A separate Playwright smoke suite runs the real content script in Chromium against a fake MyTE page to verify panel opening, hour filling, and popup-based WBS loading end to end. The live MyTE site still requires a manual smoke test after major DOM automation changes.
+The current automated suite covers pure allocation logic, panel lifecycle behavior, MyTE-like DOM scenarios for hour filling, weekly pattern application, WBS autocomplete and favorites, popup-based WBS extraction, and the background action routing logic. A separate Playwright smoke suite runs the real content script in Chromium against a fake MyTE page to verify panel opening, hour filling, and popup-based WBS loading end to end. Both suites run automatically on every pull request (see [GitHub Actions](#github-actions) below). The live MyTE site still requires a manual smoke test after major DOM automation changes.
 
 ### Test Outputs
 
@@ -235,6 +235,18 @@ The current automated suite covers pure allocation logic, panel lifecycle behavi
 - Open the Playwright HTML report with `npm run test:smoke:report`.
 
 ### GitHub Actions
+
+The repository includes a workflow at `.github/workflows/test.yml`.
+
+- Runs on every pull request and on pushes to `main`
+- The `test` job runs the Vitest suite (`npm test`)
+- The `playwright` job installs Chromium, runs the Playwright smoke suite (`npm run test:smoke`), publishes a pass/fail summary table to the job's GitHub Actions summary page, and uploads the full HTML report (screenshots, videos, traces) as a downloadable `playwright-report` artifact on the workflow run — even when tests fail
+- The `pages` job publishes that same report to GitHub Pages, viewable directly in the browser (no download needed):
+  - Pushes to `main` publish to `https://gla-showcase.github.io/myte-autofill/main/`
+  - Each pull request publishes to its own persistent `https://gla-showcase.github.io/myte-autofill/pr-<number>/`, updated on every push to that PR
+  - The resulting URL is also printed on the job's GitHub Actions summary page
+  - Traces work directly from these pages (no `show-report` command needed) since they're served over `https://`
+- To inspect traces from a CI run locally instead: download the `playwright-report` artifact, unzip it, then run `npx playwright show-report path/to/playwright-report` (opening `index.html` directly won't work for traces, see below)
 
 The repository includes a workflow at `.github/workflows/package-chrome.yml`.
 
