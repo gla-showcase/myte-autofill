@@ -92,6 +92,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
 
     steps:
       - name: Download Playwright report
@@ -124,3 +125,37 @@ jobs:
             echo ""
             echo "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ steps.target.outputs.dir }}/"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment preview link on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const url = `https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ steps.target.outputs.dir }}/`;
+            const marker = "<!-- playwright-report-link -->";
+            const body = `${marker}\n### Playwright report\n\n${url}\n\nUpdated on every push to this PR.`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber
+            });
+
+            const existing = comments.find((comment) => comment.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body
+              });
+            }
