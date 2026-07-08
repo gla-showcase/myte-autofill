@@ -127,12 +127,11 @@
   color: var(--myte-muted);
 }
 
-/* Right side: close + style selector stacked and right-aligned */
+/* Right side: feedback, theme, and close controls */
 
 .myte-header-right {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
   gap: 4px;
 }
 

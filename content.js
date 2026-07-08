@@ -1472,7 +1472,7 @@ function wireFeedbackMenuEvents() {
     const feedbackItem = event.target.closest?.(".myte-feedback-item");
     if (!feedbackItem) return;
 
-    const feedbackUrl = feedbackUrls[feedbackItem.dataset.feedbackType] || feedbackItem.dataset.url;
+    const feedbackUrl = feedbackUrls[feedbackItem.dataset.feedbackType];
     setFeedbackMenuOpen(false);
 
     if (feedbackUrl) {
@@ -1481,6 +1481,10 @@ function wireFeedbackMenuEvents() {
   });
 
   const onDocumentClick = (event) => {
+    if (feedbackButton.contains(event.target)) {
+      return;
+    }
+
     if (!feedbackWrap.contains(event.target)) {
       setFeedbackMenuOpen(false);
     }
