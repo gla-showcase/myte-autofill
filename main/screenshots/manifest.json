@@ -1,0 +1,22 @@
+[
+  {
+    "title": "opens the panel and fills the fake MyTE timesheet",
+    "name": "fill-timesheet-screenshot.png"
+  },
+  {
+    "title": "loads active WBS entries from the popup and seeds the first allocation",
+    "name": "load-wbs-screenshot.png"
+  },
+  {
+    "title": "supports WBS autocomplete, favorites, and outside-click closing",
+    "name": "autocomplete-favorites-screenshot.png"
+  },
+  {
+    "title": "displays the correct panel subtitle text",
+    "name": "panel-subtitle-screenshot.png"
+  },
+  {
+    "title": "persists theme selection after closing and reopening the panel",
+    "name": "theme-persistence-screenshot.png"
+  }
+]
