@@ -4,9 +4,12 @@ function handleActionClick(chromeApi, tab) {
     const active = tabs[0];
     const url = active?.url || "";
 
-    const isMyTe =
-      url.startsWith("https://myte.accenture.com/") ||
-      url.startsWith("https://myte.accenture.com");
+    let isMyTe = false;
+    try {
+      isMyTe = new URL(url).hostname === "myte.accenture.com";
+    } catch {
+      isMyTe = false;
+    }
 
     if (isMyTe && active.id) {
       // On MyTE: toggle in-page panel

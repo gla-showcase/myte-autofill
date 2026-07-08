@@ -38,4 +38,16 @@ describe("background.js", () => {
     expect(chrome.tabs.create).toHaveBeenCalledWith({ url: "https://myte.accenture.com/#/time" });
     expect(chrome.tabs.sendMessage).not.toHaveBeenCalled();
   });
+
+  it("does not treat a look-alike host with the MyTE origin as a prefix as MyTE", async () => {
+    const { api, chrome } = await loadBackgroundScript();
+    chrome.tabs.query.mockImplementation((_query, callback) => {
+      callback([{ id: 9, url: "https://myte.accenture.com.evil.example/#/time" }]);
+    });
+
+    api.handleActionClick(chrome, {});
+
+    expect(chrome.tabs.create).toHaveBeenCalledWith({ url: "https://myte.accenture.com/#/time" });
+    expect(chrome.tabs.sendMessage).not.toHaveBeenCalled();
+  });
 });
