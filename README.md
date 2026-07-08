@@ -260,6 +260,8 @@ The repository also includes a release workflow at `.github/workflows/release-ch
 - Push a tag like `v1.2.3`
 - The workflow validates that the tag version matches `manifest.json`, builds the package, creates a GitHub Release, and attaches the zip, contents manifest, and generated release notes
 
+Tags don't have to be pushed by hand: `.github/workflows/auto-tag-release.yml` runs on every push to `main` that changes `manifest.json`. If the manifest's version doesn't already have a matching `vX.Y.Z` tag, it creates and pushes one, which triggers `release-chrome.yml` automatically. It authenticates with the `COPILOT_AGENT_TOKEN` secret rather than the default `GITHUB_TOKEN`, because tag pushes made with the default token don't trigger other workflows.
+
 The repository also includes Copilot bug automation workflows:
 
 - `.github/workflows/copilot-bug-intake.yml`: validates new bug issues, applies agent labels, and assigns valid issues to GitHub Copilot coding agent

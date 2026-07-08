@@ -1,0 +1,65 @@
+name: Auto Tag Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - manifest.json
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Read manifest version
+        id: version
+        run: |
+          version=$(node -p "require('./manifest.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check if tag already exists
+        id: check
+        run: |
+          if git rev-parse "refs/tags/v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check token configuration
+        id: token
+        run: |
+          if [ -n "${{ secrets.COPILOT_AGENT_TOKEN }}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create and push release tag
+        if: steps.check.outputs.exists != 'true' && steps.token.outputs.configured == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.COPILOT_AGENT_TOKEN }}
+          TAG_NAME: v${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$TAG_NAME"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          git push origin "$TAG_NAME"
+
+      - name: Warn about missing token
+        if: steps.check.outputs.exists != 'true' && steps.token.outputs.configured != 'true'
+        run: |
+          echo "::warning::manifest.json version ${{ steps.version.outputs.version }} has no matching tag, but COPILOT_AGENT_TOKEN is not configured. A plain GITHUB_TOKEN push cannot be used here because tag pushes made with the default token do not trigger other workflows (release-chrome.yml would never run). Configure COPILOT_AGENT_TOKEN or push the tag manually: git tag v${{ steps.version.outputs.version }} && git push origin v${{ steps.version.outputs.version }}"
