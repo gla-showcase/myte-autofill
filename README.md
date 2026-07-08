@@ -6,7 +6,7 @@ Autofill Accenture MyTE timesheets with multi-WBS allocations and homeworking/of
 ![Edge Add-ons](https://img.shields.io/badge/Edge_Add--ons-Pending-blue?logo=microsoftedge&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 ![Status](https://img.shields.io/badge/Status-Active-brightgreen)
-![Version](https://img.shields.io/badge/Version-1.4.3-purple)
+![Version](https://img.shields.io/badge/Version-1.4.4-purple)
 
 <img width="1400" height="933" alt="marquee-promo-tile-1400x560 png" src="https://github.com/user-attachments/assets/de0b8adc-c3d2-4f52-be44-0cfa90b37de0" />
 
@@ -344,5 +344,6 @@ Pull requests should preserve the extension’s **single purpose**:
 ## 📄 License
 
 MIT License.
+
 
 

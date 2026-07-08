@@ -73,14 +73,6 @@ try {
     $contentsPath = Join-Path $DistPath "myte-autofill-$version-chrome-contents.txt"
     $releaseNotesPath = Join-Path $DistPath "myte-autofill-$version-release-notes.md"
 
-    $requiredPaths = @(
-        'manifest.json',
-        'background.js',
-        'content.js',
-        'panel.html',
-        'styles.css',
-        'icons'
-    )
     $productPaths = @(
         'manifest.json',
         'background.js',
@@ -100,7 +92,7 @@ try {
 
     New-Item -ItemType Directory -Path $stageDir -Force | Out-Null
 
-    foreach ($relativePath in $requiredPaths) {
+    foreach ($relativePath in $productPaths) {
         $sourcePath = Join-Path $root $relativePath
         if (-not (Test-Path $sourcePath)) {
             throw "Required packaging path not found: $relativePath"

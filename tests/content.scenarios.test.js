@@ -435,14 +435,15 @@ describe("content.js scenarios", () => {
     installCheckboxMouseEventShim();
 
     api.state.panel.querySelector("#myte-fill-btn-fixed").click();
-    await api.wait(700);
+    await vi.waitFor(() => {
+      expect(document.getElementById("office-client-0").checked).toBe(true);
+      expect(document.getElementById("jai-respect-mon-repos-quotidien-0").checked).toBe(true);
+      expect(document.getElementById("jai-respect-mon-repos-hebdomadaire-0").checked).toBe(true);
+    });
 
     expect(globalThis.alert).not.toHaveBeenCalledWith(
       expect.stringContaining("did not keep their value")
     );
-    expect(document.getElementById("office-client-0").checked).toBe(true);
-    expect(document.getElementById("jai-respect-mon-repos-quotidien-0").checked).toBe(true);
-    expect(document.getElementById("jai-respect-mon-repos-hebdomadaire-0").checked).toBe(true);
   });
 
   it("can fill the same timesheet more than once", async () => {
