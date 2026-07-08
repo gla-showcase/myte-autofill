@@ -193,6 +193,56 @@ describe("content.js scenarios", () => {
     expect(document.querySelectorAll("#myte-helper-panel")).toHaveLength(1);
   });
 
+  it("toggles and dismisses the feedback menu from the panel header", async () => {
+    const { api } = await openPanelWithStorage({});
+    const feedbackButton = api.state.panel.querySelector("#myte-feedback-btn");
+    const feedbackMenu = api.state.panel.querySelector(".myte-feedback-menu");
+
+    expect(feedbackMenu.hidden).toBe(true);
+    expect(feedbackButton.getAttribute("aria-expanded")).toBe("false");
+
+    feedbackButton.click();
+    expect(feedbackMenu.hidden).toBe(false);
+    expect(feedbackButton.getAttribute("aria-expanded")).toBe("true");
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(feedbackMenu.hidden).toBe(true);
+    expect(feedbackButton.getAttribute("aria-expanded")).toBe("false");
+
+    feedbackButton.click();
+    document.body.dispatchEvent(new NativeMouseEvent("click", { bubbles: true }));
+    expect(feedbackMenu.hidden).toBe(true);
+    expect(feedbackButton.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("opens feedback links in a new tab from the panel menu", async () => {
+    const { api } = await openPanelWithStorage({});
+    const feedbackButton = api.state.panel.querySelector("#myte-feedback-btn");
+    const feedbackMenu = api.state.panel.querySelector(".myte-feedback-menu");
+    const feedbackItems = api.state.panel.querySelectorAll(".myte-feedback-item");
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+    feedbackButton.click();
+    feedbackItems[0].click();
+    expect(openSpy).toHaveBeenNthCalledWith(
+      1,
+      "https://github.com/gla-showcase/myte-autofill/issues/new?template=bug_report.md",
+      "_blank",
+      "noopener"
+    );
+    expect(feedbackMenu.hidden).toBe(true);
+
+    feedbackButton.click();
+    feedbackItems[1].click();
+    expect(openSpy).toHaveBeenNthCalledWith(
+      2,
+      "https://github.com/gla-showcase/myte-autofill/issues/new?template=feature_request.md",
+      "_blank",
+      "noopener"
+    );
+    expect(feedbackMenu.hidden).toBe(true);
+  });
+
   it("fills a multi-WBS week with exact rounded hours", async () => {
     const { api } = await loadContentScript();
     buildHoursGrid();

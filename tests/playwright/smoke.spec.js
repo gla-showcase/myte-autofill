@@ -665,6 +665,52 @@ test.describe("content.js smoke tests", () => {
     await attachSuccessfulArtifacts(page, testInfo, "panel-subtitle", browserOutput);
   });
 
+  test("opens feedback issue-template links from the panel header menu", async ({ page }, testInfo) => {
+    const browserOutput = collectBrowserOutput(page);
+    await installExtensionHarness(page, {
+      dailyHours: 7.7,
+      weeklyPattern: { 0: "HW", 1: "HW", 2: "HW", 3: "HW", 4: "HW" },
+      wbsAllocations: [{ code: "WBS-1", weight: 1 }],
+      availableWbs: [{ code: "WBS-1", description: "Migration" }],
+      favoriteWbs: [],
+      autoCheckRest: true,
+      themeStyle: "corporate"
+    });
+
+    await openPanel(page);
+    await page.evaluate(() => {
+      window.__myteOpenCalls = [];
+      window.open = (...args) => {
+        window.__myteOpenCalls.push(args);
+        return null;
+      };
+    });
+
+    await page.click("#myte-feedback-btn");
+    await expect(page.locator(".myte-feedback-menu")).toBeVisible();
+    await page.locator(".myte-feedback-item", { hasText: "Report a bug" }).click();
+    await expect(page.locator(".myte-feedback-menu")).toBeHidden();
+
+    await page.click("#myte-feedback-btn");
+    await page.locator(".myte-feedback-item", { hasText: "Request a feature" }).click();
+
+    const openCalls = await page.evaluate(() => window.__myteOpenCalls);
+    expect(openCalls).toEqual([
+      [
+        "https://github.com/gla-showcase/myte-autofill/issues/new?template=bug_report.md",
+        "_blank",
+        "noopener"
+      ],
+      [
+        "https://github.com/gla-showcase/myte-autofill/issues/new?template=feature_request.md",
+        "_blank",
+        "noopener"
+      ]
+    ]);
+
+    await attachSuccessfulArtifacts(page, testInfo, "feedback-links", browserOutput);
+  });
+
   test("persists theme selection after closing and reopening the panel", async ({ page }, testInfo) => {
     const browserOutput = collectBrowserOutput(page);
     await installExtensionHarness(page, {

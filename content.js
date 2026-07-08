@@ -3,6 +3,8 @@
  *************************************************/
 
 const MYTE_STORAGE_KEY = "myteAutofillConfig";
+const FEEDBACK_BUG_URL = "https://github.com/gla-showcase/myte-autofill/issues/new?template=bug_report.md";
+const FEEDBACK_FEATURE_URL = "https://github.com/gla-showcase/myte-autofill/issues/new?template=feature_request.md";
 
 const defaultConfig = {
   dailyHours: 7.7,
@@ -30,7 +32,8 @@ const state = {
   panelOpenRequested: false,
   activeWbsPickerIndex: null,
   wbsDrafts: {},
-  isSelectingWbsOption: false
+  isSelectingWbsOption: false,
+  feedbackMenuHandlers: null
 };
 
 /***********************
@@ -1001,6 +1004,7 @@ function removePanel() {
   state.wbsFilter = "";
   state.activeWbsPickerIndex = null;
   state.wbsDrafts = {};
+  cleanupFeedbackMenuHandlers();
 
   if (state.panel) {
     state.panel.remove();
@@ -1154,6 +1158,8 @@ function wirePanelEvents() {
       saveConfig();
       applyThemeClass();
     });
+
+  wireFeedbackMenuEvents();
 
   // Reload WBS button
   state.panel
@@ -1424,6 +1430,73 @@ function wirePanelEvents() {
     });
 }
 
+function setFeedbackMenuOpen(isOpen) {
+  const feedbackButton = state.panel?.querySelector("#myte-feedback-btn");
+  const feedbackMenu = state.panel?.querySelector(".myte-feedback-menu");
+
+  if (!feedbackButton || !feedbackMenu) return;
+
+  feedbackButton.setAttribute("aria-expanded", String(isOpen));
+  feedbackMenu.hidden = !isOpen;
+}
+
+function cleanupFeedbackMenuHandlers() {
+  if (!state.feedbackMenuHandlers) return;
+
+  document.removeEventListener("click", state.feedbackMenuHandlers.onDocumentClick);
+  document.removeEventListener("keydown", state.feedbackMenuHandlers.onDocumentKeydown);
+  state.feedbackMenuHandlers = null;
+}
+
+function wireFeedbackMenuEvents() {
+  if (!state.panel) return;
+
+  cleanupFeedbackMenuHandlers();
+
+  const feedbackWrap = state.panel.querySelector(".myte-feedback-wrap");
+  const feedbackButton = state.panel.querySelector("#myte-feedback-btn");
+  const feedbackMenu = state.panel.querySelector(".myte-feedback-menu");
+
+  if (!feedbackWrap || !feedbackButton || !feedbackMenu) return;
+
+  const feedbackUrls = {
+    bug_report: FEEDBACK_BUG_URL,
+    feature_request: FEEDBACK_FEATURE_URL
+  };
+
+  feedbackButton.addEventListener("click", () => {
+    setFeedbackMenuOpen(feedbackMenu.hidden);
+  });
+
+  feedbackMenu.addEventListener("click", (event) => {
+    const feedbackItem = event.target.closest?.(".myte-feedback-item");
+    if (!feedbackItem) return;
+
+    const feedbackUrl = feedbackUrls[feedbackItem.dataset.feedbackType] || feedbackItem.dataset.url;
+    setFeedbackMenuOpen(false);
+
+    if (feedbackUrl) {
+      window.open(feedbackUrl, "_blank", "noopener");
+    }
+  });
+
+  const onDocumentClick = (event) => {
+    if (!feedbackWrap.contains(event.target)) {
+      setFeedbackMenuOpen(false);
+    }
+  };
+
+  const onDocumentKeydown = (event) => {
+    if (event.key === "Escape") {
+      setFeedbackMenuOpen(false);
+    }
+  };
+
+  document.addEventListener("click", onDocumentClick);
+  document.addEventListener("keydown", onDocumentKeydown);
+  state.feedbackMenuHandlers = { onDocumentClick, onDocumentKeydown };
+}
+
 /***********************
  * MESSAGE LISTENER
  ***********************/
@@ -1446,6 +1519,8 @@ async function init() {
 }
 
 function resetTestState(configOverrides = {}) {
+  cleanupFeedbackMenuHandlers();
+
   state.config = {
     ...defaultConfig,
     ...configOverrides,
@@ -1472,6 +1547,7 @@ function resetTestState(configOverrides = {}) {
   state.activeWbsPickerIndex = null;
   state.wbsDrafts = {};
   state.isSelectingWbsOption = false;
+  state.feedbackMenuHandlers = null;
 }
 
 function exposeTestApi() {

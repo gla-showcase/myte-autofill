@@ -18,6 +18,24 @@
         </div>
         <div class="myte-header-right">
             <button id="myte-close-btn" title="Close" aria-label="Close panel">&times;</button>
+            <div class="myte-feedback-wrap">
+                <button id="myte-feedback-btn" title="Give feedback" aria-label="Give feedback" aria-haspopup="true"
+                    aria-expanded="false">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                        aria-hidden="true">
+                        <path d="M9 18h6M10 22h4M12 2a7 7 0 0 1 4 12.9V17a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1v-2.1A7 7 0 0 1 12 2z" />
+                    </svg>
+                </button>
+                <div class="myte-feedback-menu" hidden>
+                    <button type="button" class="myte-feedback-item" data-feedback-type="bug_report">
+                        🐛 Report a bug
+                    </button>
+                    <button type="button" class="myte-feedback-item" data-feedback-type="feature_request">
+                        ✨ Request a feature
+                    </button>
+                </div>
+            </div>
             <select id="myte-theme-select" aria-label="Theme">
                 <option value="corporate">Corporate</option>
                 <option value="dev">Dev</option>
