@@ -12,24 +12,24 @@
     "maxFailures": 0,
     "metadata": {
       "ci": {
-        "commitHref": "https://github.com/gla-showcase/myte-autofill/commit/2e656bd46cb4313533b9c423dfaa2906cb302d1c",
-        "commitHash": "2e656bd46cb4313533b9c423dfaa2906cb302d1c",
-        "buildHref": "https://github.com/gla-showcase/myte-autofill/actions/runs/28930693825"
+        "commitHref": "https://github.com/gla-showcase/myte-autofill/commit/9320b7520d982f4abef11b909c4787a22e999ff1",
+        "commitHash": "9320b7520d982f4abef11b909c4787a22e999ff1",
+        "buildHref": "https://github.com/gla-showcase/myte-autofill/actions/runs/28931037186"
       },
       "gitCommit": {
-        "shortHash": "2e656bd",
-        "hash": "2e656bd46cb4313533b9c423dfaa2906cb302d1c",
-        "subject": "Fix auto-tag-release credentials",
-        "body": "Fix auto-tag-release credentials\n\nSets persist-credentials: false on checkout so the COPILOT_AGENT_TOKEN PAT is the credential used for the tag push, instead of the default GITHUB_TOKEN persisted by actions/checkout.",
+        "shortHash": "9320b75",
+        "hash": "9320b7520d982f4abef11b909c4787a22e999ff1",
+        "subject": "Create SECURITY.md for security policy",
+        "body": "Create SECURITY.md for security policy\n\nAdded a security policy document outlining supported versions and vulnerability reporting.",
         "author": {
           "name": "Guillaume Lambert",
           "email": "guillaumelamb@users.noreply.github.com",
-          "time": 1783501303000
+          "time": 1783501639000
         },
         "committer": {
           "name": "GitHub",
           "email": "noreply@github.com",
-          "time": 1783501303000
+          "time": 1783501639000
         },
         "branch": "main"
       },
@@ -43,24 +43,24 @@
         "retries": 0,
         "metadata": {
           "ci": {
-            "commitHref": "https://github.com/gla-showcase/myte-autofill/commit/2e656bd46cb4313533b9c423dfaa2906cb302d1c",
-            "commitHash": "2e656bd46cb4313533b9c423dfaa2906cb302d1c",
-            "buildHref": "https://github.com/gla-showcase/myte-autofill/actions/runs/28930693825"
+            "commitHref": "https://github.com/gla-showcase/myte-autofill/commit/9320b7520d982f4abef11b909c4787a22e999ff1",
+            "commitHash": "9320b7520d982f4abef11b909c4787a22e999ff1",
+            "buildHref": "https://github.com/gla-showcase/myte-autofill/actions/runs/28931037186"
           },
           "gitCommit": {
-            "shortHash": "2e656bd",
-            "hash": "2e656bd46cb4313533b9c423dfaa2906cb302d1c",
-            "subject": "Fix auto-tag-release credentials",
-            "body": "Fix auto-tag-release credentials\n\nSets persist-credentials: false on checkout so the COPILOT_AGENT_TOKEN PAT is the credential used for the tag push, instead of the default GITHUB_TOKEN persisted by actions/checkout.",
+            "shortHash": "9320b75",
+            "hash": "9320b7520d982f4abef11b909c4787a22e999ff1",
+            "subject": "Create SECURITY.md for security policy",
+            "body": "Create SECURITY.md for security policy\n\nAdded a security policy document outlining supported versions and vulnerability reporting.",
             "author": {
               "name": "Guillaume Lambert",
               "email": "guillaumelamb@users.noreply.github.com",
-              "time": 1783501303000
+              "time": 1783501639000
             },
             "committer": {
               "name": "GitHub",
               "email": "noreply@github.com",
-              "time": 1783501303000
+              "time": 1783501639000
             },
             "branch": "main"
           },
@@ -139,12 +139,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2538,
+                      "duration": 2652,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-07-08T09:02:20.223Z",
+                      "startTime": "2026-07-08T09:07:53.089Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -204,12 +204,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2406,
+                      "duration": 2412,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-07-08T09:02:23.497Z",
+                      "startTime": "2026-07-08T09:07:56.806Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -269,12 +269,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2179,
+                      "duration": 2203,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-07-08T09:02:25.986Z",
+                      "startTime": "2026-07-08T09:07:59.298Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -334,12 +334,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1040,
+                      "duration": 1064,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-07-08T09:02:28.236Z",
+                      "startTime": "2026-07-08T09:08:01.581Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -399,12 +399,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 456,
+                      "duration": 507,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-07-08T09:02:29.374Z",
+                      "startTime": "2026-07-08T09:08:02.740Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -464,12 +464,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 571,
+                      "duration": 603,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-07-08T09:02:29.884Z",
+                      "startTime": "2026-07-08T09:08:03.297Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -520,8 +520,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-07-08T09:02:19.056Z",
-    "duration": 11508.665,
+    "startTime": "2026-07-08T09:07:51.853Z",
+    "duration": 12167.517,
     "expected": 6,
     "skipped": 0,
     "unexpected": 0,
