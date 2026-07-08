@@ -1481,10 +1481,6 @@ function wireFeedbackMenuEvents() {
   });
 
   const onDocumentClick = (event) => {
-    if (feedbackButton.contains(event.target)) {
-      return;
-    }
-
     if (!feedbackWrap.contains(event.target)) {
       setFeedbackMenuOpen(false);
     }
