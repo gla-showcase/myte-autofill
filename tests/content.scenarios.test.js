@@ -380,7 +380,7 @@ describe("content.js scenarios", () => {
     const { api } = await loadContentScript();
     buildHoursGrid();
 
-    const result = await api.fillTimesheetCellsWithGptLogic({
+    const result = await api.fillTimesheetGridCells({
       hours: "7,7",
       resolvedSelections: [{ rowNumber: 1, code: "WBS-1", rowIndex: 1 }],
       wbsSelections: [{ rowNumber: 1, code: "WBS-1" }]
@@ -526,7 +526,7 @@ describe("content.js scenarios", () => {
     chargeCell.textContent = "WBS-1";
     document.body.appendChild(chargeCell);
 
-    const result = await api.fillTimesheetCellsWithGptLogic({
+    const result = await api.fillTimesheetGridCells({
       hours: "7.7",
       resolvedSelections: [{ rowNumber: 1, code: "WBS-1", rowIndex: 1 }],
       wbsSelections: [{ rowNumber: 1, code: "WBS-1" }]
@@ -616,7 +616,7 @@ describe("content.js scenarios", () => {
     chargeCell.textContent = "WBS-1";
     document.body.appendChild(chargeCell);
 
-    const result = await api.fillTimesheetCellsWithGptLogic({
+    const result = await api.fillTimesheetGridCells({
       hours: "7.7",
       resolvedSelections: [{ rowNumber: 1, code: "WBS-1", rowIndex: 1 }],
       wbsSelections: [{ rowNumber: 1, code: "WBS-1" }]
@@ -704,7 +704,7 @@ describe("content.js scenarios", () => {
     chargeCell.textContent = "WBS-1";
     document.body.appendChild(chargeCell);
 
-    const result = await api.fillTimesheetCellsWithGptLogic({
+    const result = await api.fillTimesheetGridCells({
       hours: "7.7",
       resolvedSelections: [{ rowNumber: 1, code: "WBS-1", rowIndex: 1 }],
       wbsSelections: [{ rowNumber: 1, code: "WBS-1" }]
@@ -805,7 +805,7 @@ describe("content.js scenarios", () => {
 
     document.getElementById("entryGridHoursCell-0-1").click();
 
-    const result = await api.fillTimesheetCellsWithGptLogic({
+    const result = await api.fillTimesheetGridCells({
       hours: "7.7",
       resolvedSelections: [{ rowNumber: 1, code: "WBS-1", rowIndex: 1 }],
       wbsSelections: [{ rowNumber: 1, code: "WBS-1" }]

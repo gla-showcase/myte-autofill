@@ -832,7 +832,7 @@ async function ensureWbsInRowByCode(code, rowNumber, fallbackRowIndex = null) {
 /***********************
  * HOURS FILLING LOGIC
  ***********************/
-const MYTE_GPT_FILL_DEFAULTS = {
+const MYTE_GRID_FILL_DEFAULTS = {
   hours: "7.7",
   delayMs: 12,
   skipFilledCells: true,
@@ -1134,8 +1134,8 @@ function collectTargetCellsForSelections(gridRoot, resolvedSelections, options) 
     : mergeTargetCells(targetCells, fallbackCells);
 }
 
-async function fillTimesheetCellsWithGptLogic(overrides = {}) {
-  const options = { ...MYTE_GPT_FILL_DEFAULTS, ...overrides };
+async function fillTimesheetGridCells(overrides = {}) {
+  const options = { ...MYTE_GRID_FILL_DEFAULTS, ...overrides };
   options.hours = formatHoursForInput(options.hours);
   const gridRoot = getGridRoot();
 
@@ -1242,7 +1242,7 @@ async function fillTimesheetWithConfig(config) {
 
     let fillResult;
     try {
-      fillResult = await fillTimesheetCellsWithGptLogic({
+      fillResult = await fillTimesheetGridCells({
         hours: formatHoursForInput(hours),
         wbsSelections: [wbsSelection],
         resolvedSelections,
@@ -2503,7 +2503,7 @@ function exposeTestApi() {
     getWorkingDayIndices,
     computeDailyHoursPerWbs,
     mergeTargetCells,
-    fillTimesheetCellsWithGptLogic,
+    fillTimesheetGridCells,
     fillTimesheetWithConfig,
     applyWeeklyPatternAndRest,
     applyThemeClass,
