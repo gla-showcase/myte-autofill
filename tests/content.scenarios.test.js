@@ -197,6 +197,7 @@ describe("content.js scenarios", () => {
     const { api } = await openPanelWithStorage({});
     const feedbackButton = api.state.panel.querySelector("#myte-feedback-btn");
     const feedbackMenu = api.state.panel.querySelector(".myte-feedback-menu");
+    const focusSpy = vi.spyOn(feedbackButton, "focus");
 
     expect(feedbackMenu.hidden).toBe(true);
     expect(feedbackButton.getAttribute("aria-expanded")).toBe("false");
@@ -208,11 +209,13 @@ describe("content.js scenarios", () => {
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect(feedbackMenu.hidden).toBe(true);
     expect(feedbackButton.getAttribute("aria-expanded")).toBe("false");
+    expect(focusSpy).toHaveBeenCalledTimes(1);
 
     feedbackButton.click();
     document.body.dispatchEvent(new NativeMouseEvent("click", { bubbles: true }));
     expect(feedbackMenu.hidden).toBe(true);
     expect(feedbackButton.getAttribute("aria-expanded")).toBe("false");
+    expect(focusSpy).toHaveBeenCalledTimes(2);
   });
 
   it("opens feedback links in a new tab from the panel menu", async () => {

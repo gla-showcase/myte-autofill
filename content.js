@@ -1430,14 +1430,46 @@ function wirePanelEvents() {
     });
 }
 
-function setFeedbackMenuOpen(isOpen) {
+function setFeedbackMenuOpen(isOpen, options = {}) {
+  const { feedbackWrap = null, restoreFocus = false } = options;
   const feedbackButton = state.panel?.querySelector("#myte-feedback-btn");
   const feedbackMenu = state.panel?.querySelector(".myte-feedback-menu");
 
   if (!feedbackButton || !feedbackMenu) return;
 
+  const wasOpen = !feedbackMenu.hidden;
+
   feedbackButton.setAttribute("aria-expanded", String(isOpen));
   feedbackMenu.hidden = !isOpen;
+
+  if (isOpen) {
+    if (!state.feedbackMenuHandlers && feedbackWrap) {
+      const onDocumentClick = (event) => {
+        if (!feedbackWrap.contains(event.target)) {
+          setFeedbackMenuOpen(false, { restoreFocus: true });
+        }
+      };
+
+      const onDocumentKeydown = (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setFeedbackMenuOpen(false, { restoreFocus: true });
+        }
+      };
+
+      document.addEventListener("click", onDocumentClick);
+      document.addEventListener("keydown", onDocumentKeydown);
+      state.feedbackMenuHandlers = { onDocumentClick, onDocumentKeydown };
+    }
+
+    return;
+  }
+
+  cleanupFeedbackMenuHandlers();
+
+  if (restoreFocus && wasOpen) {
+    feedbackButton.focus();
+  }
 }
 
 function cleanupFeedbackMenuHandlers() {
@@ -1465,7 +1497,7 @@ function wireFeedbackMenuEvents() {
   };
 
   feedbackButton.addEventListener("click", () => {
-    setFeedbackMenuOpen(feedbackMenu.hidden);
+    setFeedbackMenuOpen(feedbackMenu.hidden, { feedbackWrap });
   });
 
   feedbackMenu.addEventListener("click", (event) => {
@@ -1479,22 +1511,6 @@ function wireFeedbackMenuEvents() {
       window.open(feedbackUrl, "_blank", "noopener");
     }
   });
-
-  const onDocumentClick = (event) => {
-    if (!feedbackWrap.contains(event.target)) {
-      setFeedbackMenuOpen(false);
-    }
-  };
-
-  const onDocumentKeydown = (event) => {
-    if (event.key === "Escape") {
-      setFeedbackMenuOpen(false);
-    }
-  };
-
-  document.addEventListener("click", onDocumentClick);
-  document.addEventListener("keydown", onDocumentKeydown);
-  state.feedbackMenuHandlers = { onDocumentClick, onDocumentKeydown };
 }
 
 /***********************
