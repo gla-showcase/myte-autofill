@@ -127,13 +127,15 @@
   color: var(--myte-muted);
 }
 
-/* Right side: close + style selector stacked and right-aligned */
-
+/* Right side: feedback, theme, and close controls */
 .myte-header-right {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
   gap: 4px;
+}
+
+.myte-feedback-wrap {
+  position: relative;
 }
 
 /* Close button */
@@ -148,9 +150,59 @@
   border-radius: 999px;
 }
 
-#myte-close-btn:hover {
+#myte-feedback-btn {
+  border: none;
+  background: transparent;
+  color: var(--myte-muted);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.15s, background-color 0.15s;
+  display: flex;
+  align-items: center;
+}
+
+#myte-close-btn:hover,
+#myte-feedback-btn:hover,
+.myte-feedback-item:hover {
   background-color: var(--myte-primary-soft);
   color: var(--myte-primary);
+}
+
+#myte-feedback-btn svg {
+  display: block;
+}
+
+.myte-feedback-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 200px;
+  overflow: hidden;
+  background: var(--myte-bg);
+  border: 1px solid var(--myte-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  z-index: 10;
+}
+
+.myte-feedback-menu[hidden] {
+  display: none;
+}
+
+.myte-feedback-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: var(--myte-text);
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+  transition: background-color 0.12s, color 0.12s;
 }
 
 /* Style dropdown in header (no label) */
