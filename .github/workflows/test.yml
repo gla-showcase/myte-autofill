@@ -78,6 +78,10 @@ jobs:
             fs.appendFileSync(summaryPath, lines.join("\n") + "\n");
           '
 
+      - name: Copy JSON results into report
+        if: always()
+        run: cp test-results/playwright/results.json playwright-report/results.json || true
+
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v7
@@ -109,6 +113,45 @@ jobs:
           else
             echo "dir=main" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Extract test screenshots
+        run: |
+          node -e '
+            const fs = require("fs");
+            const path = require("path");
+            const resultsPath = "playwright-report/results.json";
+            const outDir = "playwright-report/screenshots";
+            fs.mkdirSync(outDir, { recursive: true });
+
+            if (!fs.existsSync(resultsPath)) {
+              console.log("No results.json found, skipping screenshot extraction.");
+              fs.writeFileSync(path.join(outDir, "manifest.json"), "[]");
+              process.exit(0);
+            }
+
+            const json = JSON.parse(fs.readFileSync(resultsPath, "utf8"));
+            const shots = [];
+
+            function walk(suite) {
+              for (const spec of suite.specs || []) {
+                for (const test of spec.tests || []) {
+                  for (const result of test.results || []) {
+                    for (const att of result.attachments || []) {
+                      if (att.name && att.name.endsWith("-screenshot.png") && att.body) {
+                        fs.writeFileSync(path.join(outDir, att.name), Buffer.from(att.body, "base64"));
+                        shots.push({ title: spec.title, name: att.name });
+                      }
+                    }
+                  }
+                }
+              }
+              for (const nested of suite.suites || []) walk(nested);
+            }
+
+            for (const suite of json.suites || []) walk(suite);
+            fs.writeFileSync(path.join(outDir, "manifest.json"), JSON.stringify(shots, null, 2));
+            console.log(`Extracted ${shots.length} screenshot(s).`);
+          '
 
       - name: Publish report to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
@@ -155,10 +198,24 @@ jobs:
         uses: actions/github-script@v9
         with:
           script: |
+            const fs = require("fs");
+
             const prNumber = context.payload.pull_request.number;
-            const url = `https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ steps.target.outputs.dir }}/`;
+            const baseUrl = `https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ steps.target.outputs.dir }}/`;
             const marker = "<!-- playwright-report-link -->";
-            const body = `${marker}\n### Playwright report\n\n${url}\n\nUpdated on every push to this PR.`;
+
+            let screenshotsSection = "";
+            const manifestPath = "playwright-report/screenshots/manifest.json";
+            if (fs.existsSync(manifestPath)) {
+              const shots = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+              if (shots.length) {
+                screenshotsSection = "\n\n" + shots
+                  .map((shot) => `**${shot.title}**\n\n![${shot.title}](${baseUrl}screenshots/${shot.name})`)
+                  .join("\n\n");
+              }
+            }
+
+            const body = `${marker}\n### Playwright report\n\n${baseUrl}\n\nUpdated on every push to this PR.${screenshotsSection}`;
 
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
